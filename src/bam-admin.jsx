@@ -1,14 +1,23 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Users, FileText, Megaphone, BarChart3, Eye, LogOut, Search, Download, MoreVertical, X, Plus, Trash2, GripVertical, ChevronDown, Clock, Send, Shield, Edit3, Check } from "lucide-react";
+import { Users, FileText, Megaphone, BarChart3, Eye, LogOut, Search, Download, MoreVertical, X, Plus, Trash2, GripVertical, ChevronDown, Clock, Send, Shield, Edit3, Check, Sun, Moon } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 const GOLD = "#E2DD9F";
-const BG = "#0A0A0A";
-const CARD = "#1A1A1A";
-const BORDER = "#2A2A2A";
-const TEXT = "#F2F2F2";
-const DIM = "#666";
-const MID = "#999";
+
+const BAM_LOGO_PNG="data:image/png;base64,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";
+
+const DARK_ADMIN = {
+  bg: "#0A0A0A", card: "#1A1A1A", border: "#2A2A2A",
+  text: "#F2F2F2", dim: "#666", mid: "#999",
+  inputBg: "#111", headerBg: "#1A1A1A", hoverRow: "#1E1E1E",
+  hoverMenu: "#222", modalBg: "rgba(0,0,0,0.7)",
+};
+const LIGHT_ADMIN = {
+  bg: "#F5F5F5", card: "#FFFFFF", border: "#E0E0E0",
+  text: "#111111", dim: "#999", mid: "#666",
+  inputBg: "#F0F0F0", headerBg: "#FFFFFF", hoverRow: "#F5F5F5",
+  hoverMenu: "#EEE", modalBg: "rgba(0,0,0,0.3)",
+};
 
 const ADMIN_LOGINS = {
   Coleman: "BAMcoleman2025",
@@ -62,17 +71,28 @@ const btnStyle = (primary) => ({
   cursor: "pointer", fontFamily: ff, display: "flex", alignItems: "center", gap: 6,
 });
 
-const inputBase = {
+const mkInput = (C) => ({
   width: "100%", padding: "10px 14px", borderRadius: 8, fontSize: 13,
-  fontFamily: ff, background: "#111", color: TEXT, border: `1px solid ${BORDER}`,
+  fontFamily: ff, background: C.inputBg, color: C.text, border: `1px solid ${C.border}`,
   outline: "none", boxSizing: "border-box",
-};
+});
 
-const selectBase = { ...inputBase, cursor: "pointer", appearance: "none", paddingRight: 32 };
+const mkSelect = (C) => ({ ...mkInput(C), cursor: "pointer", appearance: "none", paddingRight: 32 });
 
-const cardStyle = {
-  background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 20,
-};
+const mkCard = (C) => ({
+  background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20,
+});
+
+// Legacy aliases (AdminGate login screen is always dark)
+const BG = DARK_ADMIN.bg;
+const CARD = DARK_ADMIN.card;
+const BORDER = DARK_ADMIN.border;
+const TEXT = DARK_ADMIN.text;
+const DIM = DARK_ADMIN.dim;
+const MID = DARK_ADMIN.mid;
+const inputBase = mkInput(DARK_ADMIN);
+const selectBase = mkSelect(DARK_ADMIN);
+const cardStyle = mkCard(DARK_ADMIN);
 
 // ── PASSWORD GATE ──────────────────────────────────────────────────────────
 
@@ -92,10 +112,9 @@ function AdminGate({ onLogin }) {
   };
 
   return (
-    <div style={{ height: "100vh", background: BG, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: ff }}>
+    <div style={{ height: "100vh", background: DARK_ADMIN.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: ff }}>
       <form onSubmit={submit} style={{ ...cardStyle, width: 360, textAlign: "center" }}>
-        <div style={{ fontFamily: hf, fontSize: 36, color: GOLD, letterSpacing: 3, marginBottom: 4 }}>BAM ADMIN</div>
-        <div style={{ fontSize: 12, color: DIM, marginBottom: 28, letterSpacing: 1 }}>COACHES PLATFORM</div>
+        <img src={BAM_LOGO_PNG} alt="BAM" style={{ width: 52, height: 52, marginBottom: 20 }} />
         <input placeholder="Username" value={user} onChange={e => setUser(e.target.value)}
           style={{ ...inputBase, marginBottom: 12 }} />
         <input placeholder="Password" type="password" value={pass} onChange={e => setPass(e.target.value)}
@@ -111,16 +130,17 @@ function AdminGate({ onLogin }) {
 
 // ── MODAL ──────────────────────────────────────────────────────────────────
 
-function Modal({ children, onClose, title, width = 520 }) {
+function Modal({ children, onClose, title, width = 520, C = DARK_ADMIN }) {
+  const cs = mkCard(C);
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: ff }}
       onClick={onClose}>
-      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.7)" }} />
-      <div style={{ ...cardStyle, position: "relative", width, maxWidth: "90vw", maxHeight: "85vh", overflowY: "auto", zIndex: 1 }}
+      <div style={{ position: "absolute", inset: 0, background: C.modalBg }} />
+      <div style={{ ...cs, position: "relative", width, maxWidth: "90vw", maxHeight: "85vh", overflowY: "auto", zIndex: 1 }}
         onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <div style={{ fontFamily: hf, fontSize: 22, color: TEXT, letterSpacing: 1 }}>{title}</div>
-          <X size={18} color={DIM} style={{ cursor: "pointer" }} onClick={onClose} />
+          <div style={{ fontFamily: hf, fontSize: 22, color: C.text, letterSpacing: 1 }}>{title}</div>
+          <X size={18} color={C.dim} style={{ cursor: "pointer" }} onClick={onClose} />
         </div>
         {children}
       </div>
@@ -130,7 +150,9 @@ function Modal({ children, onClose, title, width = 520 }) {
 
 // ── MEMBERS TAB ────────────────────────────────────────────────────────────
 
-function MembersTab() {
+function MembersTab({ C }) {
+  const { card: CARD, border: BORDER, text: TEXT, dim: DIM, mid: MID, inputBg, hoverRow, hoverMenu } = C;
+  const inputBase = mkInput(C), selectBase = mkSelect(C), cardStyle = mkCard(C);
   const [members, setMembers] = useState(MOCK_MEMBERS);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("All");
@@ -197,7 +219,7 @@ function MembersTab() {
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, color: TEXT }}>
             <thead>
-              <tr style={{ background: "#111", borderBottom: `1px solid ${BORDER}` }}>
+              <tr style={{ background: inputBg, borderBottom: `1px solid ${BORDER}` }}>
                 {["First", "Last", "Email", "Country", "City", "Role", "Experience", "Joined", "Status", ""].map(h => (
                   <th key={h} style={{ padding: "12px 14px", textAlign: "left", fontWeight: 700, color: MID, fontSize: 11, letterSpacing: 0.5, textTransform: "uppercase" }}>{h}</th>
                 ))}
@@ -206,7 +228,7 @@ function MembersTab() {
             <tbody>
               {filtered.map(m => (
                 <tr key={m.id} style={{ borderBottom: `1px solid ${BORDER}` }}
-                  onMouseEnter={e => e.currentTarget.style.background = "#1E1E1E"}
+                  onMouseEnter={e => e.currentTarget.style.background = hoverRow}
                   onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                   <td style={{ padding: "10px 14px" }}>{m.first}</td>
                   <td style={{ padding: "10px 14px" }}>{m.last}</td>
@@ -230,13 +252,13 @@ function MembersTab() {
                       <div style={{ position: "absolute", right: 14, top: 36, background: CARD, border: `1px solid ${BORDER}`, borderRadius: 8, zIndex: 10, minWidth: 160, boxShadow: "0 8px 24px rgba(0,0,0,0.6)" }}>
                         <div style={{ padding: "10px 14px", fontSize: 13, color: TEXT, cursor: "pointer" }}
                           onClick={() => { setMsgModal(m); setMenuOpen(null); }}
-                          onMouseEnter={e => e.currentTarget.style.background = "#222"}
+                          onMouseEnter={e => e.currentTarget.style.background = hoverMenu}
                           onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                           <Send size={12} style={{ marginRight: 8 }} />Send Message
                         </div>
                         <div style={{ padding: "10px 14px", fontSize: 13, color: m.status === "active" ? "#E57373" : "#5AB584", cursor: "pointer" }}
                           onClick={() => toggleStatus(m.id)}
-                          onMouseEnter={e => e.currentTarget.style.background = "#222"}
+                          onMouseEnter={e => e.currentTarget.style.background = hoverMenu}
                           onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                           {m.status === "active" ? "Suspend" : "Reactivate"}
                         </div>
@@ -254,7 +276,7 @@ function MembersTab() {
 
       {/* Message Modal */}
       {msgModal && (
-        <Modal title={`Message ${msgModal.first} ${msgModal.last}`} onClose={() => { setMsgModal(null); setMsgText(""); }}>
+        <Modal title={`Message ${msgModal.first} ${msgModal.last}`} onClose={() => { setMsgModal(null); setMsgText(""); }} C={C}>
           <textarea placeholder="Type your message..." value={msgText} onChange={e => setMsgText(e.target.value)}
             style={{ ...inputBase, height: 120, resize: "vertical", marginBottom: 16 }} />
           <button style={btnStyle(true)} onClick={() => { setMsgModal(null); setMsgText(""); }}>
@@ -268,7 +290,9 @@ function MembersTab() {
 
 // ── CONTENT MANAGER TAB ────────────────────────────────────────────────────
 
-function ContentManagerTab() {
+function ContentManagerTab({ C }) {
+  const { card: CARD, border: BORDER, text: TEXT, dim: DIM, mid: MID, inputBg } = C;
+  const inputBase = mkInput(C), selectBase = mkSelect(C), cardStyle = mkCard(C);
   const [contentData, setContentData] = useState(() => {
     // Pull initial content from the main app's CONTENT object
     const sections = {};
@@ -368,7 +392,7 @@ function ContentManagerTab() {
 
       {/* Add/Edit Modal */}
       {addModal && (
-        <Modal title={editItem ? "Edit Content" : "Add Content"} onClose={() => { setAddModal(false); setEditItem(null); }} width={600}>
+        <Modal title={editItem ? "Edit Content" : "Add Content"} onClose={() => { setAddModal(false); setEditItem(null); }} width={600} C={C}>
           <div style={{ display: "grid", gap: 14 }}>
             <div>
               <label style={{ fontSize: 11, color: MID, display: "block", marginBottom: 4 }}>Title</label>
@@ -445,7 +469,9 @@ function ContentManagerTab() {
 
 // ── ANNOUNCEMENTS TAB ──────────────────────────────────────────────────────
 
-function AnnouncementsTab() {
+function AnnouncementsTab({ C }) {
+  const { card: CARD, border: BORDER, text: TEXT, dim: DIM, mid: MID } = C;
+  const inputBase = mkInput(C), selectBase = mkSelect(C), cardStyle = mkCard(C);
   const [announcements, setAnnouncements] = useState(MOCK_ANNOUNCEMENTS);
   const [modal, setModal] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -520,7 +546,7 @@ function AnnouncementsTab() {
       </div>
 
       {modal && (
-        <Modal title={editId ? "Edit Announcement" : "New Announcement"} onClose={() => { setModal(false); setEditId(null); }}>
+        <Modal title={editId ? "Edit Announcement" : "New Announcement"} onClose={() => { setModal(false); setEditId(null); }} C={C}>
           <div style={{ display: "grid", gap: 14 }}>
             <div>
               <label style={{ fontSize: 11, color: MID, display: "block", marginBottom: 4 }}>Title</label>
@@ -567,7 +593,9 @@ const GOLD2 = "#C9C48B";
 const GOLD3 = "#B0AC78";
 const CHART_COLORS = [GOLD, GOLD2, GOLD3, "#9E9A65", "#8C8855", "#7A7645"];
 
-function AnalyticsTab() {
+function AnalyticsTab({ C }) {
+  const { card: CARD, border: BORDER, text: TEXT, dim: DIM, mid: MID } = C;
+  const cardStyle = mkCard(C);
   // Mock data
   const growthData = Array.from({ length: 30 }, (_, i) => ({
     day: `Mar ${i + 1}`, members: 180 + Math.floor(i * 2.3 + Math.random() * 8),
@@ -680,7 +708,9 @@ function AnalyticsTab() {
 
 // ── PLATFORM PREVIEW TAB ───────────────────────────────────────────────────
 
-function PlatformPreviewTab({ onExitAdmin }) {
+function PlatformPreviewTab({ onExitAdmin, C }) {
+  const { card: CARD, border: BORDER, text: TEXT, dim: DIM } = C;
+  const selectBase = mkSelect(C), cardStyle = mkCard(C);
   const [previewRole, setPreviewRole] = useState("Skills Trainer");
 
   return (
@@ -701,13 +731,13 @@ function PlatformPreviewTab({ onExitAdmin }) {
       </div>
 
       <div style={{ ...cardStyle, padding: 0, overflow: "hidden", borderRadius: 14 }}>
-        <div style={{ background: "#111", padding: "10px 16px", fontSize: 11, color: DIM, display: "flex", alignItems: "center", gap: 8, borderBottom: `1px solid ${BORDER}` }}>
+        <div style={{ background: C.inputBg, padding: "10px 16px", fontSize: 11, color: DIM, display: "flex", alignItems: "center", gap: 8, borderBottom: `1px solid ${BORDER}` }}>
           <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#E57373" }} />
           <div style={{ width: 10, height: 10, borderRadius: "50%", background: GOLD }} />
           <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#5AB584" }} />
           <span style={{ marginLeft: 8 }}>BAM Coaches Platform &mdash; Viewing as: {previewRole}</span>
         </div>
-        <div style={{ height: 500, display: "flex", alignItems: "center", justifyContent: "center", background: "#1A1A1A" }}>
+        <div style={{ height: 500, display: "flex", alignItems: "center", justifyContent: "center", background: CARD }}>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>
               <Eye size={48} color={GOLD} />
@@ -733,20 +763,21 @@ const ADMIN_TABS = [
   { id: "preview", label: "Platform Preview", Icon: Eye },
 ];
 
-function AdminLayout({ user, onLogout, onExitAdmin }) {
+function AdminLayout({ user, onLogout, onExitAdmin, dark, toggleDark }) {
   const [tab, setTab] = useState("members");
+  const C = dark ? DARK_ADMIN : LIGHT_ADMIN;
 
   return (
-    <div style={{ fontFamily: ff, background: BG, minHeight: "100vh", color: TEXT }}>
+    <div style={{ fontFamily: ff, background: C.bg, minHeight: "100vh", color: C.text, transition: "background .2s, color .2s" }}>
       {/* Top Nav */}
-      <div style={{ background: CARD, borderBottom: `1px solid ${BORDER}`, position: "sticky", top: 0, zIndex: 100 }}>
+      <div style={{ background: C.headerBg, borderBottom: `1px solid ${C.border}`, position: "sticky", top: 0, zIndex: 100, transition: "background .2s" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px", display: "flex", alignItems: "center", height: 56 }}>
-          <div style={{ fontFamily: hf, fontSize: 20, color: GOLD, letterSpacing: 2, marginRight: 40 }}>BAM ADMIN</div>
+          <img src={BAM_LOGO_PNG} alt="BAM" style={{ width: 30, height: 30, marginRight: 32 }} />
           <div style={{ display: "flex", gap: 2, flex: 1 }}>
             {ADMIN_TABS.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)}
                 style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: tab === t.id ? 700 : 500,
-                  background: tab === t.id ? `${GOLD}18` : "transparent", color: tab === t.id ? GOLD : MID,
+                  background: tab === t.id ? `${GOLD}18` : "transparent", color: tab === t.id ? GOLD : C.mid,
                   border: "none", cursor: "pointer", fontFamily: ff, display: "flex", alignItems: "center", gap: 6,
                   transition: "all .15s" }}>
                 <t.Icon size={15} />
@@ -755,7 +786,12 @@ function AdminLayout({ user, onLogout, onExitAdmin }) {
             ))}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <span style={{ fontSize: 12, color: DIM }}>Logged in as <strong style={{ color: TEXT }}>{user}</strong></span>
+            <span style={{ fontSize: 12, color: C.dim }}>Logged in as <strong style={{ color: C.text }}>{user}</strong></span>
+            <button onClick={toggleDark} style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
+              padding: "6px 8px", cursor: "pointer", display: "flex", alignItems: "center" }}
+              title={dark ? "Switch to light mode" : "Switch to dark mode"}>
+              {dark ? <Sun size={14} color={GOLD} /> : <Moon size={14} color={C.mid} />}
+            </button>
             <button onClick={onLogout} style={{ ...btnStyle(false), padding: "6px 14px", fontSize: 12 }}>
               <LogOut size={13} /> Log Out
             </button>
@@ -765,11 +801,11 @@ function AdminLayout({ user, onLogout, onExitAdmin }) {
 
       {/* Content */}
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: 24 }}>
-        {tab === "members" && <MembersTab />}
-        {tab === "content" && <ContentManagerTab />}
-        {tab === "announcements" && <AnnouncementsTab />}
-        {tab === "analytics" && <AnalyticsTab />}
-        {tab === "preview" && <PlatformPreviewTab onExitAdmin={onExitAdmin} />}
+        {tab === "members" && <MembersTab C={C} />}
+        {tab === "content" && <ContentManagerTab C={C} />}
+        {tab === "announcements" && <AnnouncementsTab C={C} />}
+        {tab === "analytics" && <AnalyticsTab C={C} />}
+        {tab === "preview" && <PlatformPreviewTab onExitAdmin={onExitAdmin} C={C} />}
       </div>
     </div>
   );
@@ -781,6 +817,7 @@ export default function AdminPortal({ onExitAdmin }) {
   const [user, setUser] = useState(() => {
     try { return sessionStorage.getItem("bam_admin_user") || null; } catch { return null; }
   });
+  const [dark, setDark] = useState(true);
 
   const handleLogin = (u) => {
     setUser(u);
@@ -793,5 +830,5 @@ export default function AdminPortal({ onExitAdmin }) {
   };
 
   if (!user) return <AdminGate onLogin={handleLogin} />;
-  return <AdminLayout user={user} onLogout={handleLogout} onExitAdmin={onExitAdmin} />;
+  return <AdminLayout user={user} onLogout={handleLogout} onExitAdmin={onExitAdmin} dark={dark} toggleDark={() => setDark(d => !d)} />;
 }
