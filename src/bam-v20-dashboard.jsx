@@ -3079,6 +3079,7 @@ const ONBOARDING_CSS = `
 const OB_ROLES = ["Skills Trainer","Team Coach","Academy Coach","Parent/Player","College Coach","Pro Coach"];
 const OB_EXPERIENCE = ["Under 1 year","1–3 years","3–5 years","5–10 years","10+ years"];
 const OB_AGE_GROUPS = ["Youth (under 12)","Middle School","High School","College","Pro","Mixed"];
+const COUNTRY_FLAGS={"United States":"🇺🇸","Canada":"🇨🇦","United Kingdom":"🇬🇧","Australia":"🇦🇺","Nigeria":"🇳🇬","Ghana":"🇬🇭","Spain":"🇪🇸","France":"🇫🇷","Germany":"🇩🇪","Japan":"🇯🇵","China":"🇨🇳","India":"🇮🇳","Brazil":"🇧🇷","Mexico":"🇲🇽","South Africa":"🇿🇦","Philippines":"🇵🇭","Italy":"🇮🇹","Netherlands":"🇳🇱","Sweden":"🇸🇪","Greece":"🇬🇷","Turkey":"🇹🇷","Egypt":"🇪🇬","Kenya":"🇰🇪","Argentina":"🇦🇷","Colombia":"🇨🇴","Dominican Republic":"🇩🇴","Puerto Rico":"🇵🇷","New Zealand":"🇳🇿","Belgium":"🇧🇪","Portugal":"🇵🇹","Ireland":"🇮🇪","Poland":"🇵🇱","Serbia":"🇷🇸","Croatia":"🇭🇷","Lithuania":"🇱🇹","Latvia":"🇱🇻","Slovenia":"🇸🇮","Israel":"🇮🇱","Lebanon":"🇱🇧","Saudi Arabia":"🇸🇦","UAE":"🇦🇪","Qatar":"🇶🇦","South Korea":"🇰🇷","Taiwan":"🇹🇼","Indonesia":"🇮🇩","Thailand":"🇹🇭","Singapore":"🇸🇬","Other":"🌍"};
 const OB_COUNTRIES = ["United States","Canada","United Kingdom","Australia","Nigeria","Ghana","Spain","France","Germany","Japan","China","India","Brazil","Mexico","South Africa","Philippines","Italy","Netherlands","Sweden","Greece","Turkey","Egypt","Kenya","Argentina","Colombia","Dominican Republic","Puerto Rico","New Zealand","Belgium","Portugal","Ireland","Poland","Serbia","Croatia","Lithuania","Latvia","Slovenia","Israel","Lebanon","Saudi Arabia","UAE","Qatar","South Korea","Taiwan","Indonesia","Thailand","Singapore","Other"];
 const OB_CITIES = {
   "United States":["Miami","Los Angeles","New York","Chicago","Houston","Atlanta","Dallas","Phoenix","Philadelphia","San Antonio","San Diego","Denver","Seattle","Boston","Charlotte","Indianapolis","San Francisco","Portland","Las Vegas","Memphis","Other"],
@@ -3103,11 +3104,12 @@ const OB_TOUR_STEPS = [
   {ids:["playbook"],label:"Playbook Builder",desc:"Draw up plays and build your playbook visually.",type:"single"},
 ];
 
-function SearchableDropdown({options,value,onChange,placeholder,style:{marginBottom:mb,...restStyle}={}}){
+function SearchableDropdown({options,value,onChange,placeholder,style:{marginBottom:mb,...restStyle}={},renderLabel}){
   const [open,setOpen]=useState(false);
   const [search,setSearch]=useState("");
   const ref=useRef(null);
   const filtered=options.filter(o=>o.toLowerCase().includes(search.toLowerCase()));
+  const label=renderLabel||(o=>o);
   useEffect(()=>{
     const handler=(e)=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false);};
     document.addEventListener("mousedown",handler);return()=>document.removeEventListener("mousedown",handler);
@@ -3116,7 +3118,7 @@ function SearchableDropdown({options,value,onChange,placeholder,style:{marginBot
     <div ref={ref} style={{position:"relative",width:"100%",maxWidth:420,marginBottom:mb||14}}>
       <div className="ob-input" onClick={()=>setOpen(!open)} tabIndex={0}
         style={{...restStyle,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-        <span style={{color:value?"#F5F0E8":"#666"}}>{value||placeholder}</span>
+        <span style={{color:value?"#F5F0E8":"#666"}}>{value?label(value):placeholder}</span>
         <span style={{color:"#666",fontSize:10}}>▼</span>
       </div>
       {open&&(
@@ -3129,7 +3131,7 @@ function SearchableDropdown({options,value,onChange,placeholder,style:{marginBot
                 style={{padding:"10px 14px",fontSize:13,color:o===value?GOLD:"#9A9488",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",background:o===value?"rgba(226,221,159,0.08)":"transparent"}}
                 onMouseEnter={e=>e.currentTarget.style.background="rgba(226,221,159,0.06)"}
                 onMouseLeave={e=>e.currentTarget.style.background=o===value?"rgba(226,221,159,0.08)":"transparent"}>
-                {o}
+                {label(o)}
               </div>
             ))}
             {filtered.length===0&&<div style={{padding:"10px 14px",fontSize:13,color:"#4A4840"}}>No results</div>}
@@ -3142,11 +3144,12 @@ function SearchableDropdown({options,value,onChange,placeholder,style:{marginBot
 
 const BAM_LOGO_PNG="data:image/png;base64,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";
 
-function OnboardingFlow({onComplete}){
+function OnboardingFlow({onComplete,onTourStart}){
   const [screen,setScreen]=useState(0);
   const [name,setName]=useState("");
   const [country,setCountry]=useState("");
   const [city,setCity]=useState("");
+  const [customCity,setCustomCity]=useState("");
   const [roles,setRoles]=useState([]);
   const [experience,setExperience]=useState("");
   const [ageGroups,setAgeGroups]=useState([]);
@@ -3154,7 +3157,6 @@ function OnboardingFlow({onComplete}){
   const [goal1yr,setGoal1yr]=useState("");
   const [goal10yr,setGoal10yr]=useState("");
   const [bio,setBio]=useState("");
-  const [tourStep,setTourStep]=useState(0);
 
   const cityOptions=OB_CITIES[country]||["Other"];
 
@@ -3162,8 +3164,9 @@ function OnboardingFlow({onComplete}){
     setter(arr.includes(val)?arr.filter(v=>v!==val):[...arr,val]);
   };
 
+  const effectiveCity=customCity.trim()||city;
   const generateBio=useCallback(()=>{
-    const location=city&&country?`${city}, ${country}`:country||city;
+    const location=effectiveCity&&country?`${effectiveCity}, ${country}`:country||effectiveCity;
     const roleStr=roles.length===1?roles[0]:roles.slice(0,-1).join(", ")+" and "+roles[roles.length-1];
     const firstName=name.trim().split(" ")[0];
     const expMap={"Under 1 year":"just getting started","1–3 years":"a few years in","3–5 years":"several years of experience","5–10 years":"over half a decade of experience","10+ years":"over a decade of experience"};
@@ -3171,7 +3174,7 @@ function OnboardingFlow({onComplete}){
     const ageStr=ageGroups.length===1?ageGroups[0].toLowerCase():ageGroups.slice(0,-1).map(a=>a.toLowerCase()).join(", ")+" and "+ageGroups[ageGroups.length-1].toLowerCase();
     const bio=`I'm ${firstName}, a ${roleStr.toLowerCase()} based in ${location} with ${expPhrase} working with ${ageStr} athletes. ${separates.trim().replace(/\.$/,"")}. In the next year, my goal is to ${goal1yr.trim().toLowerCase().replace(/\.$/,"")}, and long-term I'm focused on ${goal10yr.trim().toLowerCase().replace(/\.$/,"")}.`;
     setBio(bio);
-  },[name,country,city,roles,experience,ageGroups,separates,goal1yr,goal10yr]);
+  },[name,country,effectiveCity,roles,experience,ageGroups,separates,goal1yr,goal10yr]);
 
   useEffect(()=>{
     if(screen===4) generateBio();
@@ -3256,15 +3259,22 @@ function OnboardingFlow({onComplete}){
         {progress(0,4)}
         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:38,color:"#F5F0E8",letterSpacing:2,marginBottom:8}}>LET'S LEARN A BIT ABOUT YOU</div>
         <div style={{fontSize:13,color:"#4A4840",marginBottom:32}}>Step 1 of 4</div>
-        <input className="ob-input" placeholder="Full name" value={name} onChange={e=>setName(e.target.value)}
-          style={inputStyle}/>
-        <SearchableDropdown options={OB_COUNTRIES} value={country} onChange={v=>{setCountry(v);setCity("");}} placeholder="Country" style={dropdownStyle}/>
-        <SearchableDropdown options={cityOptions} value={city} onChange={setCity} placeholder="City" style={dropdownStyle}/>
+        <div style={{width:"100%",maxWidth:420,margin:"0 auto",textAlign:"left"}}>
+          <input className="ob-input" placeholder="Full name" value={name} onChange={e=>setName(e.target.value)}
+            style={{...inputStyle,maxWidth:"100%"}}/>
+          <SearchableDropdown options={OB_COUNTRIES} value={country} onChange={v=>{setCountry(v);setCity("");setCustomCity("");}} placeholder="Country" style={dropdownStyle}
+            renderLabel={o=>COUNTRY_FLAGS[o]?`${COUNTRY_FLAGS[o]}  ${o}`:o}/>
+          <SearchableDropdown options={cityOptions} value={city} onChange={v=>{setCity(v);if(v)setCustomCity("");}} placeholder="City" style={dropdownStyle}/>
+          {(!city||city==="Other")&&(
+            <input className="ob-input" placeholder="Not seeing your city? Type it here" value={customCity} onChange={e=>setCustomCity(e.target.value)}
+              style={{...inputStyle,maxWidth:"100%",marginTop:city==="Other"?0:0}}/>
+          )}
+        </div>
         <div style={{fontSize:13,color:"#9A9488",marginBottom:12,marginTop:8,textAlign:"left"}}>Coaching role (select all that apply)</div>
         <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginBottom:8}}>
           {OB_ROLES.map(r=>pillBtn(r,roles.includes(r),()=>togglePill(r,roles,setRoles)))}
         </div>
-        {ctaBtn("NEXT",()=>setScreen(2),!name.trim()||!country||!city||roles.length===0)}
+        {ctaBtn("NEXT",()=>setScreen(2),!name.trim()||!country||(!city&&!customCity.trim())||roles.length===0)}
       </div>
     </div>
   );
@@ -3331,15 +3341,19 @@ function OnboardingFlow({onComplete}){
         <div style={{fontSize:14,color:"#9A9488",marginBottom:32}}>Based on your answers, we generated your bio. Edit it or use it as is.</div>
         <textarea className="ob-input" value={bio} onChange={e=>setBio(e.target.value)}
           style={{...inputStyle,maxWidth:"100%",height:140,resize:"vertical",lineHeight:1.7,fontSize:14}}/>
-        {ctaBtn("LOOKS GOOD",()=>setScreen(5),!bio.trim())}
+        {ctaBtn("LOOKS GOOD",()=>{if(onTourStart)onTourStart();},!bio.trim())}
       </div>
     </div>
   );
 
-  // Screen 5: Platform tour
+  // Screen 5 is now handled by TourOverlay in the parent
+  return null;
+}
+
+function TourOverlay({onComplete}){
+  const [tourStep,setTourStep]=useState(0);
   const tourData=OB_TOUR_STEPS[tourStep];
   const isLast=tourStep===OB_TOUR_STEPS.length-1;
-  // Build sidebar items matching the real sidebar structure
   const TOUR_SIDEBAR=[
     {id:"dashboard",label:"Dashboard",Icon:LayoutDashboard,indent:0},
     {id:"community",label:"Community",Icon:Users,indent:0},
@@ -3356,66 +3370,82 @@ function OnboardingFlow({onComplete}){
     {id:"playbook",label:"Playbook Builder",Icon:BookOpen,indent:0},
   ];
   const highlightIds=tourData.ids;
-  // For group highlights, also highlight the header
   const activeIds=[...highlightIds];
   if(tourData.type==="group"&&tourData.groupLabel==="Player Development") activeIds.push("_pd_header");
   if(tourData.type==="group"&&tourData.groupLabel==="Team Coaching") activeIds.push("_team_header");
 
+  // Find the Y position of the first highlighted sidebar item for tooltip placement
+  const firstHighlightIdx=TOUR_SIDEBAR.findIndex(item=>activeIds.includes(item.id));
+  const tooltipTop=Math.max(120, 76 + firstHighlightIdx * 34);
+
+  const finish=()=>{
+    try{localStorage.setItem("onboardingComplete","true");}catch(e){}
+    onComplete();
+  };
+
   return (
-    <div style={{position:"fixed",inset:0,zIndex:10000,display:"flex",fontFamily:"'DM Sans',sans-serif",background:"#080808"}}>
+    <div style={{position:"fixed",inset:0,zIndex:10000,fontFamily:"'DM Sans',sans-serif",pointerEvents:"none"}}>
       <style>{ONBOARDING_CSS}</style>
-      {/* Sidebar */}
-      <div style={{width:240,background:"#242424",borderRight:"1px solid #333",display:"flex",flexDirection:"column",flexShrink:0,position:"relative"}}>
-        <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,${GOLD},${GOLD}44,transparent)`}}/>
-        <div style={{padding:"22px 18px 16px",borderBottom:"1px solid #333",display:"flex",alignItems:"center",gap:12}}>
-          <img src={BAM_LOGO_PNG} alt="BAM" style={{width:27,height:34,objectFit:"contain",flexShrink:0,filter:"drop-shadow(0 1px 2px rgba(226,221,159,0.28))"}}/>
-          <div>
-            <div style={{fontSize:15,fontWeight:800,color:GOLD,letterSpacing:.5,lineHeight:1.1,fontFamily:"'Bebas Neue',sans-serif"}}>BY ANY MEANS</div>
-            <div style={{fontSize:9,color:"#555",letterSpacing:2,marginTop:3,fontWeight:600,textTransform:"uppercase"}}>Coaches Platform</div>
+      {/* Semi-transparent overlay */}
+      <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.6)",pointerEvents:"auto"}}/>
+      {/* Sidebar highlight layer */}
+      <div style={{position:"absolute",top:0,left:0,width:240,bottom:0,pointerEvents:"auto"}}>
+        <div style={{position:"relative",height:"100%",display:"flex",flexDirection:"column"}}>
+          {/* Sidebar header area - just spacing */}
+          <div style={{height:66,flexShrink:0}}/>
+          <div style={{flex:1,padding:"10px 0",overflowY:"auto"}}>
+            {TOUR_SIDEBAR.map(item=>{
+              const isActive=activeIds.includes(item.id);
+              const isHeader=item.isHeader;
+              if(!isActive) return <div key={item.id} style={{padding:item.indent?"7px 18px 7px 44px":`${isHeader?"10px":"9px"} 18px`,fontSize:isHeader?10:item.indent?12.5:13}}/>;
+              return (
+                <div key={item.id} style={{position:"relative",
+                  padding:item.indent?"7px 18px 7px 44px":`${isHeader?"10px":"9px"} 18px`,
+                  fontSize:isHeader?10:item.indent?12.5:13,
+                  fontWeight:700,
+                  color:isHeader?GOLD:"#F2F2F2",
+                  background:isHeader?"rgba(226,221,159,0.08)":"rgba(226,221,159,0.12)",
+                  borderLeft:isHeader?"3px solid transparent":`3px solid ${GOLD}`,
+                  display:"flex",alignItems:"center",gap:isHeader?11:item.indent?10:11,
+                  letterSpacing:isHeader?.8:0,textTransform:isHeader?"uppercase":"none",
+                  borderRadius:6,margin:"0 6px"}}>
+                  <item.Icon size={isHeader?15:item.indent?14:16} color={GOLD} strokeWidth={2.2}/>
+                  {item.label}
+                  <div className="ob-tour-ring" style={{position:"absolute",inset:-2,borderRadius:8,border:`2px solid ${GOLD}`,pointerEvents:"none"}}/>
+                </div>
+              );
+            })}
           </div>
         </div>
-        <div style={{flex:1,padding:"10px 0",overflowY:"auto"}}>
-          {TOUR_SIDEBAR.map(item=>{
-            const isActive=activeIds.includes(item.id);
-            const isHeader=item.isHeader;
-            return (
-              <div key={item.id} style={{position:"relative",
-                padding:item.indent?`7px 18px 7px 44px`:`${isHeader?"10px":"9px"} 18px`,
-                fontSize:isHeader?10:item.indent?12.5:13,
-                fontWeight:isActive?700:isHeader?700:500,
-                color:isActive?(isHeader?GOLD:"#F2F2F2"):(isHeader?"#B0B0B0":"#B0B0B0"),
-                background:isActive&&!isHeader?"rgba(226,221,159,0.1)":"transparent",
-                borderLeft:isActive&&!isHeader?`3px solid ${GOLD}`:"3px solid transparent",
-                display:"flex",alignItems:"center",gap:isHeader?11:item.indent?10:11,
-                letterSpacing:isHeader?.8:0,textTransform:isHeader?"uppercase":"none"}}>
-                <item.Icon size={isHeader?15:item.indent?14:16} color={isActive?GOLD:GOLD+"59"} strokeWidth={isActive?2.2:1.8}/>
-                {item.label}
-                {isActive&&<div className="ob-tour-ring" style={{position:"absolute",inset:2,borderRadius:8,border:`2px solid ${GOLD}`,pointerEvents:"none"}}/>}
-              </div>
-            );
-          })}
-        </div>
       </div>
-      {/* Main area */}
-      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:40}}>
-        <div className="ob-fade" key={tourStep} style={{textAlign:"center",maxWidth:480}}>
-          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,color:"#F5F0E8",letterSpacing:2,marginBottom:16}}>HERE'S YOUR PLATFORM</div>
+      {/* Tooltip card */}
+      <div className="ob-fade" key={tourStep} style={{position:"absolute",left:260,top:tooltipTop,maxWidth:400,pointerEvents:"auto"}}>
+        {/* Arrow pointing left */}
+        <div style={{position:"absolute",left:-8,top:16,width:0,height:0,borderTop:"8px solid transparent",borderBottom:"8px solid transparent",borderRight:`8px solid rgba(36,36,36,0.95)`}}/>
+        <div style={{background:"rgba(36,36,36,0.95)",border:`1px solid ${GOLD}40`,borderRadius:14,padding:"28px 32px",backdropFilter:"blur(12px)"}}>
+          <div style={{fontSize:11,color:GOLD,letterSpacing:2,fontWeight:700,textTransform:"uppercase",marginBottom:6}}>PLATFORM TOUR</div>
           <div style={{fontSize:22,fontWeight:700,color:GOLD,marginBottom:8}}>{tourData.label}</div>
-          <div style={{fontSize:15,color:"#9A9488",marginBottom:40,lineHeight:1.6}}>{tourData.desc}</div>
-          {isLast
-            ?ctaBtn("DONE",finish)
-            :<button className="ob-btn" onClick={()=>setTourStep(t=>t+1)}
-              style={{padding:"14px 40px",borderRadius:10,fontSize:14,fontWeight:700,
-                background:"transparent",color:GOLD,border:`1px solid ${GOLD}`,
-                fontFamily:"'DM Sans',sans-serif",cursor:"pointer"}}>
-              Next →
-            </button>
-          }
-          <div style={{display:"flex",gap:6,justifyContent:"center",marginTop:32}}>
-            {OB_TOUR_STEPS.map((_,i)=>(
-              <div key={i} style={{width:i===tourStep?24:8,height:4,borderRadius:2,
-                background:i<=tourStep?GOLD:"#333",transition:"all .3s"}}/>
-            ))}
+          <div style={{fontSize:14,color:"#B0A898",marginBottom:24,lineHeight:1.6}}>{tourData.desc}</div>
+          <div style={{display:"flex",alignItems:"center",gap:16}}>
+            {isLast
+              ?<button className="ob-btn" onClick={finish}
+                style={{padding:"12px 36px",borderRadius:10,fontSize:14,fontWeight:800,letterSpacing:1.5,
+                  background:GOLD,color:"#111",border:"none",fontFamily:"'Bebas Neue',sans-serif",cursor:"pointer"}}>
+                DONE
+              </button>
+              :<button className="ob-btn" onClick={()=>setTourStep(t=>t+1)}
+                style={{padding:"12px 32px",borderRadius:10,fontSize:14,fontWeight:700,
+                  background:"transparent",color:GOLD,border:`1px solid ${GOLD}`,
+                  fontFamily:"'DM Sans',sans-serif",cursor:"pointer"}}>
+                Next →
+              </button>
+            }
+            <div style={{display:"flex",gap:5}}>
+              {OB_TOUR_STEPS.map((_,i)=>(
+                <div key={i} style={{width:i===tourStep?20:6,height:4,borderRadius:2,
+                  background:i<=tourStep?GOLD:"#555",transition:"all .3s"}}/>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -3690,6 +3720,7 @@ export default function BAMFull(){
     try{ return localStorage.getItem("onboardingComplete")==="true"; }catch(e){ return false; }
   });
   const [dark,setDark]=useState(true);
+  const [tourActive,setTourActive]=useState(false);
   const [loading,setLoading]=useState(true);
   useEffect(()=>{ const t=setTimeout(()=>setLoading(false),1800); return ()=>clearTimeout(t); },[]);
   // dashIntro = true only on very first visit this session
@@ -3768,7 +3799,7 @@ export default function BAMFull(){
     </div>
   );
 
-  if(!onboarded) return <OnboardingFlow onComplete={()=>setOnboarded(true)}/>;
+  if(!onboarded&&!tourActive) return <OnboardingFlow onComplete={()=>setOnboarded(true)} onTourStart={()=>{setOnboarded(true);setTourActive(true);}}/>;
 
   return (
     <div style={{fontFamily:"'DM Sans',sans-serif",background:C.bg,height:"100vh",display:"flex",color:C.text,transition:"background .3s,color .3s",overflow:"hidden"}}>
@@ -4145,6 +4176,7 @@ export default function BAMFull(){
       {profileName&&<ProfilePanel key={profileName} name={profileName} dark={dark} C={C} onClose={()=>setProfileName(null)}/>}
       {myProfileOpen&&<MyProfilePanel C={C} dark={dark} onClose={()=>setMyProfileOpen(false)}/>}
       {mapOpen&&<MemberMapOverlay C={C} dark={dark} onClose={()=>setMapOpen(false)} onProfileClick={(name)=>{setProfileName(name);setMapOpen(false);}}/>}
+      {tourActive&&<TourOverlay onComplete={()=>setTourActive(false)}/>}
       </div>
     </div>
   );
