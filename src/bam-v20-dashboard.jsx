@@ -3792,10 +3792,15 @@ const BAM_PRODUCTS = [
   { id:"retreats", title:"Retreats", img:"/images/retreats.png", url:"https://byanymeanscoaches.com/retreats", desc:"Immersive in-person coaching retreats. Network with like-minded coaches, attend workshops, and experience hands-on training sessions." },
 ];
 
+const PAPER_TAGS = ["Skill Acquisition","Ecological Dynamics","Psychology","Athletic Performance","Other"];
+
 const MOCK_PAPERS = [
-  { id:1, title:"Constraints-Led Approach to Skill Acquisition in Sport", authors:"Davids, K., Button, C., & Bennett, S.", year:2008, journal:"International Journal of Sport Psychology", abstract:"This paper examines how manipulating task, environmental, and organismic constraints can guide learners toward functional movement solutions without prescriptive instruction." },
-  { id:2, title:"Nonlinear Pedagogy in Skill Acquisition", authors:"Chow, J.Y., Davids, K., Button, C., & Renshaw, I.", year:2016, journal:"Routledge Research in Sport Science", abstract:"Explores how nonlinear pedagogy provides a framework for understanding skill acquisition as a complex, self-organizing process shaped by interacting constraints." },
-  { id:3, title:"Ecological Dynamics and Transfer of Learning in Sport", authors:"Rosalie, S.M. & Mueller, F.", year:2014, journal:"Sports Medicine", abstract:"Reviews the ecological dynamics approach to understanding how skills learned in practice transfer to competitive performance environments." },
+  { id:1, title:"Constraints-Led Approach to Skill Acquisition in Sport", authors:"Davids, K., Button, C., & Bennett, S.", year:2008, journal:"International Journal of Sport Psychology", abstract:"This paper examines how manipulating task, environmental, and organismic constraints can guide learners toward functional movement solutions without prescriptive instruction. The constraints-led approach offers coaches a principled framework for designing practice tasks that channel athletes toward discovering effective movement patterns, rather than imposing rigid technique models.", tags:["Skill Acquisition","Ecological Dynamics"], strength_of_evidence:"Strong", doi_url:"https://doi.org/10.1080/17461390802067545", ai_summary:null },
+  { id:2, title:"Nonlinear Pedagogy in Skill Acquisition", authors:"Chow, J.Y., Davids, K., Button, C., & Renshaw, I.", year:2016, journal:"Routledge Research in Sport Science", abstract:"Explores how nonlinear pedagogy provides a framework for understanding skill acquisition as a complex, self-organizing process shaped by interacting constraints. This approach emphasizes variability in practice, representative learning design, and the manipulation of key task constraints to facilitate the emergence of functional movement solutions.", tags:["Skill Acquisition","Ecological Dynamics"], strength_of_evidence:"Strong", doi_url:"https://doi.org/10.4324/9781315813042", ai_summary:null },
+  { id:3, title:"Ecological Dynamics and Transfer of Learning in Sport", authors:"Rosalie, S.M. & Mueller, F.", year:2014, journal:"Sports Medicine", abstract:"Reviews the ecological dynamics approach to understanding how skills learned in practice transfer to competitive performance environments. Argues that transfer depends on the degree to which information-movement couplings developed in training are preserved in competition contexts.", tags:["Ecological Dynamics","Athletic Performance"], strength_of_evidence:"Moderate", doi_url:"https://doi.org/10.1007/s40279-014-0236-z", ai_summary:null },
+  { id:4, title:"Self-Determination Theory and the Psychology of Exercise", authors:"Deci, E.L. & Ryan, R.M.", year:2012, journal:"International Review of Sport and Exercise Psychology", abstract:"Examines how autonomy, competence, and relatedness needs influence intrinsic motivation in athletes. Coaches who support these basic psychological needs foster greater engagement, persistence, and well-being in their players.", tags:["Psychology"], strength_of_evidence:"Strong", doi_url:"https://doi.org/10.1080/1750984X.2012.676658", ai_summary:null },
+  { id:5, title:"Periodization of Strength Training for Basketball", authors:"Bompa, T.O. & Buzzichelli, C.", year:2019, journal:"Journal of Strength and Conditioning Research", abstract:"Provides evidence-based guidelines for structuring seasonal strength and conditioning programs for basketball athletes. Covers load management, plyometric integration, and in-season maintenance protocols tailored to the demands of competitive basketball schedules.", tags:["Athletic Performance"], strength_of_evidence:"Moderate", doi_url:"https://doi.org/10.1519/JSC.0000000000003198", ai_summary:null },
+  { id:6, title:"Growth Mindset and Athletic Development in Youth Sport", authors:"Dweck, C.S. & Yeager, D.S.", year:2019, journal:"Annual Review of Psychology", abstract:"Reviews how a growth mindset—the belief that abilities can be developed through effort and learning—impacts youth athlete development, resilience in the face of setbacks, and long-term engagement in sport. Preliminary evidence suggests mindset interventions can reduce dropout rates.", tags:["Psychology","Other"], strength_of_evidence:"Preliminary", doi_url:"https://doi.org/10.1146/annurev-psych-010418-103311", ai_summary:null },
 ];
 
 const MOCK_BOOKS = [
@@ -3808,6 +3813,8 @@ function ResourcesPage({C, dark}){
   const [expanded, setExpanded] = useState(null);
   const [summaries, setSummaries] = useState({});
   const [loadingSummary, setLoadingSummary] = useState(null);
+  const [paperTag, setPaperTag] = useState("All");
+  const [expandedPaper, setExpandedPaper] = useState(null);
 
   const toggleExpand = (id) => setExpanded(prev => prev === id ? null : id);
 
@@ -3904,25 +3911,84 @@ function ResourcesPage({C, dark}){
 
         {/* Research Papers */}
         {sectionTitle("RESEARCH PAPERS")}
-        <div style={{display:"grid",gap:12}}>
-          {MOCK_PAPERS.map(paper=>(
-            <div key={paper.id} style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:14,padding:20}}>
-              <div style={{fontSize:15,fontWeight:700,color:C.text,marginBottom:4}}>{paper.title}</div>
-              <div style={{fontSize:12,color:C.textDim,marginBottom:6}}>{paper.authors} ({paper.year}) &mdash; <em>{paper.journal}</em></div>
-              <div style={{fontSize:13,color:C.textMid,lineHeight:1.6,marginBottom:12}}>{paper.abstract}</div>
-              <button onClick={()=>generateSummary(paper)}
-                disabled={loadingSummary===paper.id || !!summaries[paper.id]}
-                style={{display:"inline-flex",alignItems:"center",gap:6,background:summaries[paper.id]?"transparent":dark?"rgba(226,221,159,0.10)":"rgba(226,221,159,0.25)",color:GOLD,padding:"7px 16px",borderRadius:8,fontSize:12,fontWeight:700,border:`1px solid ${GOLD}40`,cursor:summaries[paper.id]?"default":"pointer",fontFamily:"'DM Sans',sans-serif",opacity:summaries[paper.id]?0.5:1}}>
-                <Sparkles size={13} />
-                {loadingSummary===paper.id?"Generating...":summaries[paper.id]?"Summary Generated":"AI Summary"}
+        {/* Tag filter bar */}
+        <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:16}}>
+          {["All",...PAPER_TAGS].map(tag=>{
+            const active = paperTag===tag;
+            return (
+              <button key={tag} onClick={()=>setPaperTag(tag)}
+                style={{padding:"6px 16px",borderRadius:20,fontSize:12,fontWeight:700,fontFamily:"'DM Sans',sans-serif",border:`1px solid ${active?GOLD:C.border}`,background:active?(dark?"rgba(226,221,159,0.15)":"rgba(226,221,159,0.25)"):"transparent",color:active?GOLD:C.textDim,cursor:"pointer",transition:"all .2s"}}>
+                {tag}
               </button>
-              {summaries[paper.id]&&(
-                <div style={{marginTop:12,padding:14,background:dark?"rgba(226,221,159,0.06)":"rgba(226,221,159,0.12)",borderRadius:10,border:`1px solid ${GOLD}25`,fontSize:13,color:C.text,lineHeight:1.7,whiteSpace:"pre-wrap"}}>
-                  {summaries[paper.id]}
+            );
+          })}
+        </div>
+        <div style={{display:"grid",gap:14}}>
+          {MOCK_PAPERS.filter(p=>paperTag==="All"||p.tags.includes(paperTag)).map(paper=>{
+            const parchBg = dark ? "#2C2A22" : "#FAF6EC";
+            const parchBorder = dark ? "#3D3A2E" : "#E8E0C8";
+            const evidenceColors = { Strong:{bg:"#1B5E20",text:"#A5D6A7"}, Moderate:{bg:"#E65100",text:"#FFCC80"}, Preliminary:{bg:"#4A148C",text:"#CE93D8"} };
+            const ev = evidenceColors[paper.strength_of_evidence] || evidenceColors.Preliminary;
+            const isExpanded = expandedPaper === paper.id;
+            const abstractPreview = paper.abstract.length > 180 ? paper.abstract.slice(0,180) + "…" : paper.abstract;
+            return (
+              <div key={paper.id} style={{background:parchBg,border:`1px solid ${parchBorder}`,borderRadius:14,padding:"22px 24px",position:"relative",transition:"box-shadow .2s",boxShadow:isExpanded?`0 4px 20px ${dark?"rgba(0,0,0,0.4)":"rgba(0,0,0,0.08)"}`:"none"}}>
+                {/* Evidence badge */}
+                <div style={{position:"absolute",top:16,right:18,background:ev.bg,color:ev.text,fontSize:10,fontWeight:700,padding:"3px 10px",borderRadius:10,fontFamily:"'DM Sans',sans-serif",letterSpacing:.5,textTransform:"uppercase"}}>
+                  {paper.strength_of_evidence}
                 </div>
-              )}
-            </div>
-          ))}
+                {/* Title - serif */}
+                <div style={{fontSize:17,fontWeight:700,color:dark?"#F5F0E0":"#2C2416",fontFamily:"Georgia,'Times New Roman',serif",lineHeight:1.35,marginBottom:6,paddingRight:90}}>
+                  {paper.title}
+                </div>
+                {/* Journal & authors - small caps */}
+                <div style={{fontSize:11,color:dark?"#A89F80":"#7A7058",fontVariant:"small-caps",letterSpacing:.8,marginBottom:4,fontFamily:"'DM Sans',sans-serif"}}>
+                  {paper.journal} &middot; {paper.year}
+                </div>
+                <div style={{fontSize:11,color:dark?"#9A9278":"#8A7E64",fontVariant:"small-caps",letterSpacing:.6,marginBottom:12,fontFamily:"'DM Sans',sans-serif"}}>
+                  {paper.authors}
+                </div>
+                {/* Abstract preview */}
+                <div style={{fontSize:13,color:dark?"#C8C0A8":"#5A5040",lineHeight:1.65,marginBottom:14,fontFamily:"Georgia,'Times New Roman',serif",fontStyle:"italic"}}>
+                  {isExpanded ? paper.abstract : abstractPreview}
+                </div>
+                {/* Tags */}
+                <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:14}}>
+                  {paper.tags.map(tag=>(
+                    <span key={tag} style={{fontSize:10,fontWeight:600,padding:"3px 10px",borderRadius:10,background:dark?"rgba(226,221,159,0.10)":"rgba(226,221,159,0.18)",color:GOLD,fontFamily:"'DM Sans',sans-serif",letterSpacing:.3}}>
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+                {/* Actions row */}
+                <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                  <button onClick={()=>{setExpandedPaper(isExpanded?null:paper.id);if(!isExpanded)generateSummary(paper);}}
+                    style={{display:"inline-flex",alignItems:"center",gap:6,background:dark?"rgba(226,221,159,0.10)":"rgba(226,221,159,0.22)",color:GOLD,padding:"7px 16px",borderRadius:8,fontSize:12,fontWeight:700,border:`1px solid ${GOLD}40`,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>
+                    <Sparkles size={13} />
+                    {loadingSummary===paper.id?"Generating...":isExpanded?"Hide AI Summary":"Read AI Summary"}
+                  </button>
+                  {paper.doi_url && (
+                    <a href={paper.doi_url} target="_blank" rel="noopener noreferrer"
+                      style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:12,fontWeight:600,color:dark?"#A89F80":"#7A7058",textDecoration:"none",fontFamily:"'DM Sans',sans-serif"}}>
+                      View Paper <ExternalLink size={11} />
+                    </a>
+                  )}
+                </div>
+                {/* Expanded AI Summary */}
+                {isExpanded && summaries[paper.id] && (
+                  <div style={{marginTop:14,padding:16,background:dark?"rgba(226,221,159,0.06)":"rgba(226,221,159,0.10)",borderRadius:10,border:`1px solid ${GOLD}20`,fontSize:13,color:dark?"#E8E0C0":"#4A4230",lineHeight:1.7,whiteSpace:"pre-wrap",fontFamily:"'DM Sans',sans-serif"}}>
+                    <div style={{fontSize:11,fontWeight:700,color:GOLD,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>AI Summary for Coaches</div>
+                    {summaries[paper.id]}
+                  </div>
+                )}
+                {isExpanded && loadingSummary===paper.id && !summaries[paper.id] && (
+                  <div style={{marginTop:14,padding:16,textAlign:"center",fontSize:13,color:GOLD,fontFamily:"'DM Sans',sans-serif"}}>
+                    Generating summary…
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {/* Books */}
