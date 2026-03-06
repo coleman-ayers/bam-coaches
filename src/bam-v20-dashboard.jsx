@@ -3059,6 +3059,373 @@ function MemberMapOverlay({C, dark, onClose, onProfileClick}) {
   );
 }
 
+// ── ONBOARDING FLOW ──────────────────────────────────────────────────────
+const ONBOARDING_CSS = `
+@keyframes obFadeIn{from{opacity:0;transform:translateY(24px);}to{opacity:1;transform:translateY(0);}}
+@keyframes obPulseRing{0%{transform:scale(1);opacity:.6;}50%{transform:scale(1.15);opacity:1;}100%{transform:scale(1);opacity:.6;}}
+@keyframes obGlow{0%,100%{box-shadow:0 0 20px rgba(226,221,159,0.15);}50%{box-shadow:0 0 40px rgba(226,221,159,0.35);}}
+@keyframes obTourPulse{0%{box-shadow:0 0 0 0 rgba(226,221,159,0.5);}70%{box-shadow:0 0 0 12px rgba(226,221,159,0);}100%{box-shadow:0 0 0 0 rgba(226,221,159,0);}}
+.ob-fade{animation:obFadeIn .5s ease both;}
+.ob-btn{cursor:pointer;transition:opacity .15s,transform .1s;}
+.ob-btn:hover{opacity:.85;}
+.ob-btn:active{transform:scale(.97);}
+.ob-input{outline:none;transition:border-color .2s;}
+.ob-input:focus{border-color:#E2DD9F!important;}
+.ob-pill{cursor:pointer;transition:all .15s ease;}
+.ob-pill:hover{opacity:.85;}
+.ob-tour-ring{animation:obTourPulse 1.5s ease-in-out infinite;}
+`;
+
+const OB_ROLES = ["Skills Trainer","Team Coach","Academy Coach","Parent/Player","College Coach","Pro Coach"];
+const OB_EXPERIENCE = ["Under 1 year","1–3 years","3–5 years","5–10 years","10+ years"];
+const OB_AGE_GROUPS = ["Youth (under 12)","Middle School","High School","College","Pro","Mixed"];
+const OB_COUNTRIES = ["United States","Canada","United Kingdom","Australia","Nigeria","Ghana","Spain","France","Germany","Japan","China","India","Brazil","Mexico","South Africa","Philippines","Italy","Netherlands","Sweden","Greece","Turkey","Egypt","Kenya","Argentina","Colombia","Dominican Republic","Puerto Rico","New Zealand","Belgium","Portugal","Ireland","Poland","Serbia","Croatia","Lithuania","Latvia","Slovenia","Israel","Lebanon","Saudi Arabia","UAE","Qatar","South Korea","Taiwan","Indonesia","Thailand","Singapore","Other"];
+const OB_CITIES = {
+  "United States":["Miami","Los Angeles","New York","Chicago","Houston","Atlanta","Dallas","Phoenix","Philadelphia","San Antonio","San Diego","Denver","Seattle","Boston","Charlotte","Indianapolis","San Francisco","Portland","Las Vegas","Memphis","Other"],
+  "Canada":["Toronto","Vancouver","Montreal","Calgary","Ottawa","Edmonton","Winnipeg","Other"],
+  "United Kingdom":["London","Manchester","Birmingham","Liverpool","Leeds","Glasgow","Edinburgh","Other"],
+  "Australia":["Sydney","Melbourne","Brisbane","Perth","Adelaide","Other"],
+  "Nigeria":["Lagos","Abuja","Port Harcourt","Kano","Ibadan","Other"],
+  "Ghana":["Accra","Kumasi","Tamale","Other"],
+  "Spain":["Barcelona","Madrid","Valencia","Seville","Other"],
+  "France":["Paris","Lyon","Marseille","Toulouse","Other"],
+  "Germany":["Berlin","Munich","Hamburg","Frankfurt","Cologne","Other"],
+  "Japan":["Tokyo","Osaka","Kyoto","Yokohama","Nagoya","Other"],
+};
+const OB_TOUR_STEPS = [
+  {ids:["dashboard"],label:"Dashboard",desc:"This is your home base. Everything starts here.",type:"single"},
+  {ids:["community"],label:"Community",desc:"Come back here and introduce yourself to the family. We want to know who you are.",type:"single"},
+  {ids:["pd","insights"],label:"Player Development",desc:"This is where you'll become a better PD coach. Drills, games, and insights built for skill development.",type:"group",groupLabel:"Player Development"},
+  {ids:["team","ti","xo"],label:"Team Coaching",desc:"If you coach teams, this is for you. Film, X&O, and team-specific tools all in one place.",type:"group",groupLabel:"Team Coaching"},
+  {ids:["plans"],label:"Practice Plans",desc:"Build and save practice plans in minutes.",type:"single"},
+  {ids:["master"],label:"Masterclasses",desc:"Deep dives from Coleman and guest coaches.",type:"single"},
+  {ids:["workouts"],label:"Full Workouts",desc:"Complete workouts ready to run.",type:"single"},
+  {ids:["playbook"],label:"Playbook Builder",desc:"Draw up plays and build your playbook visually.",type:"single"},
+];
+
+function SearchableDropdown({options,value,onChange,placeholder,style:{marginBottom:mb,...restStyle}={}}){
+  const [open,setOpen]=useState(false);
+  const [search,setSearch]=useState("");
+  const ref=useRef(null);
+  const filtered=options.filter(o=>o.toLowerCase().includes(search.toLowerCase()));
+  useEffect(()=>{
+    const handler=(e)=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false);};
+    document.addEventListener("mousedown",handler);return()=>document.removeEventListener("mousedown",handler);
+  },[]);
+  return(
+    <div ref={ref} style={{position:"relative",width:"100%",maxWidth:420,marginBottom:mb||14}}>
+      <div className="ob-input" onClick={()=>setOpen(!open)} tabIndex={0}
+        style={{...restStyle,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <span style={{color:value?"#F5F0E8":"#666"}}>{value||placeholder}</span>
+        <span style={{color:"#666",fontSize:10}}>▼</span>
+      </div>
+      {open&&(
+        <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:20,background:"#1A1A1A",border:"1px solid #333",borderRadius:10,maxHeight:220,overflow:"hidden",marginTop:2}}>
+          <input autoFocus placeholder="Search..." value={search} onChange={e=>setSearch(e.target.value)}
+            style={{width:"100%",padding:"10px 14px",fontSize:13,fontFamily:"'DM Sans',sans-serif",background:"#222",color:"#F5F0E8",border:"none",borderBottom:"1px solid #333",outline:"none",boxSizing:"border-box"}}/>
+          <div style={{maxHeight:170,overflowY:"auto"}}>
+            {filtered.map(o=>(
+              <div key={o} onClick={()=>{onChange(o);setOpen(false);setSearch("");}}
+                style={{padding:"10px 14px",fontSize:13,color:o===value?GOLD:"#9A9488",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",background:o===value?"rgba(226,221,159,0.08)":"transparent"}}
+                onMouseEnter={e=>e.currentTarget.style.background="rgba(226,221,159,0.06)"}
+                onMouseLeave={e=>e.currentTarget.style.background=o===value?"rgba(226,221,159,0.08)":"transparent"}>
+                {o}
+              </div>
+            ))}
+            {filtered.length===0&&<div style={{padding:"10px 14px",fontSize:13,color:"#4A4840"}}>No results</div>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const BAM_LOGO_PNG="data:image/png;base64,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";
+
+function OnboardingFlow({onComplete}){
+  const [screen,setScreen]=useState(0);
+  const [name,setName]=useState("");
+  const [country,setCountry]=useState("");
+  const [city,setCity]=useState("");
+  const [roles,setRoles]=useState([]);
+  const [experience,setExperience]=useState("");
+  const [ageGroups,setAgeGroups]=useState([]);
+  const [separates,setSeparates]=useState("");
+  const [goal1yr,setGoal1yr]=useState("");
+  const [goal10yr,setGoal10yr]=useState("");
+  const [bio,setBio]=useState("");
+  const [tourStep,setTourStep]=useState(0);
+
+  const cityOptions=OB_CITIES[country]||["Other"];
+
+  const togglePill=(val,arr,setter)=>{
+    setter(arr.includes(val)?arr.filter(v=>v!==val):[...arr,val]);
+  };
+
+  const generateBio=useCallback(()=>{
+    const location=city&&country?`${city}, ${country}`:country||city;
+    const roleStr=roles.length===1?roles[0]:roles.slice(0,-1).join(", ")+" and "+roles[roles.length-1];
+    const firstName=name.trim().split(" ")[0];
+    const expMap={"Under 1 year":"just getting started","1–3 years":"a few years in","3–5 years":"several years of experience","5–10 years":"over half a decade of experience","10+ years":"over a decade of experience"};
+    const expPhrase=expMap[experience]||"experience";
+    const ageStr=ageGroups.length===1?ageGroups[0].toLowerCase():ageGroups.slice(0,-1).map(a=>a.toLowerCase()).join(", ")+" and "+ageGroups[ageGroups.length-1].toLowerCase();
+    const bio=`I'm ${firstName}, a ${roleStr.toLowerCase()} based in ${location} with ${expPhrase} working with ${ageStr} athletes. ${separates.trim().replace(/\.$/,"")}. In the next year, my goal is to ${goal1yr.trim().toLowerCase().replace(/\.$/,"")}, and long-term I'm focused on ${goal10yr.trim().toLowerCase().replace(/\.$/,"")}.`;
+    setBio(bio);
+  },[name,country,city,roles,experience,ageGroups,separates,goal1yr,goal10yr]);
+
+  useEffect(()=>{
+    if(screen===4) generateBio();
+  },[screen,generateBio]);
+
+  const finish=()=>{
+    try{localStorage.setItem("onboardingComplete","true");}catch(e){}
+    onComplete();
+  };
+
+  const progress=(step,total)=>(
+    <div style={{display:"flex",gap:6,justifyContent:"center",marginBottom:32}}>
+      {Array.from({length:total},(_,i)=>(
+        <div key={i} style={{width:i<=step?28:10,height:4,borderRadius:2,background:i<=step?GOLD:"#333",transition:"all .3s"}}/>
+      ))}
+    </div>
+  );
+
+  const pillBtn=(label,active,onClick)=>(
+    <div key={label} className="ob-pill" onClick={onClick}
+      style={{padding:"10px 20px",borderRadius:24,fontSize:13,fontWeight:active?700:500,
+        background:active?GOLD:"transparent",color:active?"#111":"#9A9488",
+        border:`1px solid ${active?GOLD:"#333"}`,fontFamily:"'DM Sans',sans-serif"}}>
+      {label}
+    </div>
+  );
+
+  const singlePill=(label,active,onClick)=>(
+    <div key={label} className="ob-pill" onClick={onClick}
+      style={{padding:"10px 20px",borderRadius:24,fontSize:13,fontWeight:active?700:500,
+        background:active?GOLD:"transparent",color:active?"#111":"#9A9488",
+        border:`1px solid ${active?GOLD:"#333"}`,fontFamily:"'DM Sans',sans-serif"}}>
+      {label}
+    </div>
+  );
+
+  const ctaBtn=(label,onClick,disabled)=>(
+    <button className="ob-btn" onClick={onClick} disabled={disabled}
+      style={{padding:"16px 48px",borderRadius:10,fontSize:15,fontWeight:800,letterSpacing:1.5,
+        background:disabled?"#333":GOLD,color:disabled?"#666":"#111",border:"none",
+        fontFamily:"'Bebas Neue',sans-serif",cursor:disabled?"not-allowed":"pointer",marginTop:20}}>
+      {label}
+    </button>
+  );
+
+  const inputStyle={width:"100%",maxWidth:420,padding:"14px 18px",borderRadius:10,fontSize:14,
+    fontFamily:"'DM Sans',sans-serif",background:"#1A1A1A",color:"#F5F0E8",
+    border:"1px solid #333",marginBottom:14};
+
+  const dropdownStyle={padding:"14px 18px",borderRadius:10,fontSize:14,
+    fontFamily:"'DM Sans',sans-serif",background:"#1A1A1A",color:"#F5F0E8",
+    border:"1px solid #333"};
+
+  const wrap={position:"fixed",inset:0,zIndex:10000,background:"#080808",display:"flex",
+    flexDirection:"column",alignItems:"center",justifyContent:"center",
+    fontFamily:"'DM Sans',sans-serif",overflow:"auto"};
+
+  // Screen 0: Welcome
+  if(screen===0) return (
+    <div style={wrap}>
+      <style>{ONBOARDING_CSS}</style>
+      <div className="ob-fade" style={{textAlign:"center",padding:40}}>
+        <img src={BAM_LOGO_PNG} alt="BAM" style={{width:70,height:88,objectFit:"contain",marginBottom:16,
+          filter:"drop-shadow(0 0 24px rgba(226,221,159,0.35))"}}/>
+        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:72,color:GOLD,lineHeight:1,
+          letterSpacing:4,marginBottom:8,animation:"obGlow 3s ease-in-out infinite",
+          textShadow:"0 0 30px rgba(226,221,159,0.2)"}}>BAM</div>
+        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:64,color:"#F5F0E8",lineHeight:1,
+          letterSpacing:3,marginBottom:32}}>YOU'RE IN.</div>
+        <div style={{fontSize:15,color:"#9A9488",lineHeight:1.8,maxWidth:480,margin:"0 auto 40px"}}>
+          You just unlocked access to the<br/>
+          <span style={{color:"#F5F0E8",fontWeight:600}}>DRILL LIBRARY</span> · <span style={{color:"#F5F0E8",fontWeight:600}}>COMMUNITY</span> · <span style={{color:"#F5F0E8",fontWeight:600}}>PRACTICE PLANS</span><br/>
+          <span style={{color:"#F5F0E8",fontWeight:600}}>MASTERCLASSES</span> · <span style={{color:"#F5F0E8",fontWeight:600}}>X&O BREAKDOWNS</span> · <span style={{color:"#F5F0E8",fontWeight:600}}>FULL WORKOUTS</span>
+        </div>
+        {ctaBtn("LET'S BUILD",()=>setScreen(1))}
+      </div>
+    </div>
+  );
+
+  // Screen 1: Profile basics
+  if(screen===1) return (
+    <div style={wrap}>
+      <style>{ONBOARDING_CSS}</style>
+      <div className="ob-fade" style={{textAlign:"center",padding:40,width:"100%",maxWidth:540}}>
+        {progress(0,4)}
+        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:38,color:"#F5F0E8",letterSpacing:2,marginBottom:8}}>LET'S LEARN A BIT ABOUT YOU</div>
+        <div style={{fontSize:13,color:"#4A4840",marginBottom:32}}>Step 1 of 4</div>
+        <input className="ob-input" placeholder="Full name" value={name} onChange={e=>setName(e.target.value)}
+          style={inputStyle}/>
+        <SearchableDropdown options={OB_COUNTRIES} value={country} onChange={v=>{setCountry(v);setCity("");}} placeholder="Country" style={dropdownStyle}/>
+        <SearchableDropdown options={cityOptions} value={city} onChange={setCity} placeholder="City" style={dropdownStyle}/>
+        <div style={{fontSize:13,color:"#9A9488",marginBottom:12,marginTop:8,textAlign:"left"}}>Coaching role (select all that apply)</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginBottom:8}}>
+          {OB_ROLES.map(r=>pillBtn(r,roles.includes(r),()=>togglePill(r,roles,setRoles)))}
+        </div>
+        {ctaBtn("NEXT",()=>setScreen(2),!name.trim()||!country||!city||roles.length===0)}
+      </div>
+    </div>
+  );
+
+  // Screen 2: Coaching background
+  if(screen===2) return (
+    <div style={wrap}>
+      <style>{ONBOARDING_CSS}</style>
+      <div className="ob-fade" style={{textAlign:"center",padding:40,width:"100%",maxWidth:540}}>
+        {progress(1,4)}
+        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,color:"#F5F0E8",letterSpacing:2,marginBottom:8}}>YOUR COACHING STORY</div>
+        <div style={{fontSize:13,color:"#4A4840",marginBottom:32}}>Step 2 of 4</div>
+        <div style={{fontSize:13,color:"#9A9488",marginBottom:12,textAlign:"left"}}>How long have you been coaching?</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginBottom:24}}>
+          {OB_EXPERIENCE.map(e=>singlePill(e,experience===e,()=>setExperience(e)))}
+        </div>
+        <div style={{fontSize:13,color:"#9A9488",marginBottom:12,textAlign:"left"}}>What age groups do you work with? (select all that apply)</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginBottom:8}}>
+          {OB_AGE_GROUPS.map(a=>pillBtn(a,ageGroups.includes(a),()=>togglePill(a,ageGroups,setAgeGroups)))}
+        </div>
+        {ctaBtn("NEXT",()=>setScreen(3),!experience||ageGroups.length===0)}
+      </div>
+    </div>
+  );
+
+  // Screen 3: Coaching identity
+  if(screen===3) return (
+    <div style={wrap}>
+      <style>{ONBOARDING_CSS}</style>
+      <div className="ob-fade" style={{textAlign:"center",padding:40,width:"100%",maxWidth:540}}>
+        {progress(2,4)}
+        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,color:"#F5F0E8",letterSpacing:2,marginBottom:8}}>WHAT DRIVES YOU</div>
+        <div style={{fontSize:13,color:"#4A4840",marginBottom:32}}>Step 3 of 4</div>
+        <div style={{textAlign:"left",marginBottom:14}}>
+          <div style={{fontSize:13,color:"#9A9488",marginBottom:8}}>What separates you as a coach?</div>
+          <textarea className="ob-input" placeholder="Be honest. What do you do differently?" value={separates}
+            onChange={e=>setSeparates(e.target.value)} maxLength={300}
+            style={{...inputStyle,height:80,resize:"none",marginBottom:0}}/>
+        </div>
+        <div style={{textAlign:"left",marginBottom:14}}>
+          <div style={{fontSize:13,color:"#9A9488",marginBottom:8}}>What's your goal as a coach in the next year?</div>
+          <textarea className="ob-input" placeholder="Be specific." value={goal1yr}
+            onChange={e=>setGoal1yr(e.target.value)} maxLength={200}
+            style={{...inputStyle,height:64,resize:"none",marginBottom:0}}/>
+        </div>
+        <div style={{textAlign:"left",marginBottom:0}}>
+          <div style={{fontSize:13,color:"#9A9488",marginBottom:8}}>What's your goal as a coach in the next 10 years?</div>
+          <textarea className="ob-input" placeholder="Think big." value={goal10yr}
+            onChange={e=>setGoal10yr(e.target.value)} maxLength={200}
+            style={{...inputStyle,height:64,resize:"none",marginBottom:0}}/>
+        </div>
+        {ctaBtn("NEXT",()=>setScreen(4),!separates.trim()||!goal1yr.trim()||!goal10yr.trim())}
+      </div>
+    </div>
+  );
+
+  // Screen 4: Bio generation
+  if(screen===4) return (
+    <div style={wrap}>
+      <style>{ONBOARDING_CSS}</style>
+      <div className="ob-fade" style={{textAlign:"center",padding:40,width:"100%",maxWidth:540}}>
+        {progress(3,4)}
+        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,color:"#F5F0E8",letterSpacing:2,marginBottom:8}}>YOUR COACH BIO</div>
+        <div style={{fontSize:14,color:"#9A9488",marginBottom:32}}>Based on your answers, we generated your bio. Edit it or use it as is.</div>
+        <textarea className="ob-input" value={bio} onChange={e=>setBio(e.target.value)}
+          style={{...inputStyle,maxWidth:"100%",height:140,resize:"vertical",lineHeight:1.7,fontSize:14}}/>
+        {ctaBtn("LOOKS GOOD",()=>setScreen(5),!bio.trim())}
+      </div>
+    </div>
+  );
+
+  // Screen 5: Platform tour
+  const tourData=OB_TOUR_STEPS[tourStep];
+  const isLast=tourStep===OB_TOUR_STEPS.length-1;
+  // Build sidebar items matching the real sidebar structure
+  const TOUR_SIDEBAR=[
+    {id:"dashboard",label:"Dashboard",Icon:LayoutDashboard,indent:0},
+    {id:"community",label:"Community",Icon:Users,indent:0},
+    {id:"_pd_header",label:"Player Development",Icon:Target,indent:0,isHeader:true},
+    {id:"pd",label:"Drills & Games",Icon:Target,indent:1,parent:"pd"},
+    {id:"insights",label:"Insights",Icon:Brain,indent:1,parent:"pd"},
+    {id:"_team_header",label:"Team Coaching",Icon:Megaphone,indent:0,isHeader:true},
+    {id:"team",label:"Drills & Games",Icon:Megaphone,indent:1,parent:"team"},
+    {id:"ti",label:"Insights",Icon:Lightbulb,indent:1,parent:"team"},
+    {id:"xo",label:"X & O Breakdowns",Icon:Clipboard,indent:1,parent:"team"},
+    {id:"plans",label:"Practice Plans",Icon:FileText,indent:0},
+    {id:"master",label:"Masterclasses",Icon:GraduationCap,indent:0},
+    {id:"workouts",label:"Full Workouts",Icon:Zap,indent:0},
+    {id:"playbook",label:"Playbook Builder",Icon:BookOpen,indent:0},
+  ];
+  const highlightIds=tourData.ids;
+  // For group highlights, also highlight the header
+  const activeIds=[...highlightIds];
+  if(tourData.type==="group"&&tourData.groupLabel==="Player Development") activeIds.push("_pd_header");
+  if(tourData.type==="group"&&tourData.groupLabel==="Team Coaching") activeIds.push("_team_header");
+
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:10000,display:"flex",fontFamily:"'DM Sans',sans-serif",background:"#080808"}}>
+      <style>{ONBOARDING_CSS}</style>
+      {/* Sidebar */}
+      <div style={{width:240,background:"#242424",borderRight:"1px solid #333",display:"flex",flexDirection:"column",flexShrink:0,position:"relative"}}>
+        <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,${GOLD},${GOLD}44,transparent)`}}/>
+        <div style={{padding:"22px 18px 16px",borderBottom:"1px solid #333",display:"flex",alignItems:"center",gap:12}}>
+          <img src={BAM_LOGO_PNG} alt="BAM" style={{width:27,height:34,objectFit:"contain",flexShrink:0,filter:"drop-shadow(0 1px 2px rgba(226,221,159,0.28))"}}/>
+          <div>
+            <div style={{fontSize:15,fontWeight:800,color:GOLD,letterSpacing:.5,lineHeight:1.1,fontFamily:"'Bebas Neue',sans-serif"}}>BY ANY MEANS</div>
+            <div style={{fontSize:9,color:"#555",letterSpacing:2,marginTop:3,fontWeight:600,textTransform:"uppercase"}}>Coaches Platform</div>
+          </div>
+        </div>
+        <div style={{flex:1,padding:"10px 0",overflowY:"auto"}}>
+          {TOUR_SIDEBAR.map(item=>{
+            const isActive=activeIds.includes(item.id);
+            const isHeader=item.isHeader;
+            return (
+              <div key={item.id} style={{position:"relative",
+                padding:item.indent?`7px 18px 7px 44px`:`${isHeader?"10px":"9px"} 18px`,
+                fontSize:isHeader?10:item.indent?12.5:13,
+                fontWeight:isActive?700:isHeader?700:500,
+                color:isActive?(isHeader?GOLD:"#F2F2F2"):(isHeader?"#B0B0B0":"#B0B0B0"),
+                background:isActive&&!isHeader?"rgba(226,221,159,0.1)":"transparent",
+                borderLeft:isActive&&!isHeader?`3px solid ${GOLD}`:"3px solid transparent",
+                display:"flex",alignItems:"center",gap:isHeader?11:item.indent?10:11,
+                letterSpacing:isHeader?.8:0,textTransform:isHeader?"uppercase":"none"}}>
+                <item.Icon size={isHeader?15:item.indent?14:16} color={isActive?GOLD:GOLD+"59"} strokeWidth={isActive?2.2:1.8}/>
+                {item.label}
+                {isActive&&<div className="ob-tour-ring" style={{position:"absolute",inset:2,borderRadius:8,border:`2px solid ${GOLD}`,pointerEvents:"none"}}/>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {/* Main area */}
+      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:40}}>
+        <div className="ob-fade" key={tourStep} style={{textAlign:"center",maxWidth:480}}>
+          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,color:"#F5F0E8",letterSpacing:2,marginBottom:16}}>HERE'S YOUR PLATFORM</div>
+          <div style={{fontSize:22,fontWeight:700,color:GOLD,marginBottom:8}}>{tourData.label}</div>
+          <div style={{fontSize:15,color:"#9A9488",marginBottom:40,lineHeight:1.6}}>{tourData.desc}</div>
+          {isLast
+            ?ctaBtn("DONE",finish)
+            :<button className="ob-btn" onClick={()=>setTourStep(t=>t+1)}
+              style={{padding:"14px 40px",borderRadius:10,fontSize:14,fontWeight:700,
+                background:"transparent",color:GOLD,border:`1px solid ${GOLD}`,
+                fontFamily:"'DM Sans',sans-serif",cursor:"pointer"}}>
+              Next →
+            </button>
+          }
+          <div style={{display:"flex",gap:6,justifyContent:"center",marginTop:32}}>
+            {OB_TOUR_STEPS.map((_,i)=>(
+              <div key={i} style={{width:i===tourStep?24:8,height:4,borderRadius:2,
+                background:i<=tourStep?GOLD:"#333",transition:"all .3s"}}/>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── DASHBOARD INTRO ANIMATION ─────────────────────────────────────────────
 function DashIntro({dark}){
   // 3 concentric rings, staggered
@@ -3322,6 +3689,9 @@ function MyProfilePanel({C, dark, onClose}){
 }
 
 export default function BAMFull(){
+  const [onboarded,setOnboarded]=useState(()=>{
+    try{ return localStorage.getItem("onboardingComplete")==="true"; }catch(e){ return false; }
+  });
   const [dark,setDark]=useState(true);
   const [loading,setLoading]=useState(true);
   useEffect(()=>{ const t=setTimeout(()=>setLoading(false),1800); return ()=>clearTimeout(t); },[]);
@@ -3400,6 +3770,8 @@ export default function BAMFull(){
       <div style={{marginTop:28,fontSize:18,fontWeight:900,letterSpacing:4,color:GOLD,textTransform:"uppercase"}}>YOU'RE IN.</div>
     </div>
   );
+
+  if(!onboarded) return <OnboardingFlow onComplete={()=>setOnboarded(true)}/>;
 
   return (
     <div style={{fontFamily:"'DM Sans',sans-serif",background:C.bg,height:"100vh",display:"flex",color:C.text,transition:"background .3s,color .3s",overflow:"hidden"}}>
