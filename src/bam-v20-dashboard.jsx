@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { LayoutDashboard, Users, Target, Megaphone, Brain, Lightbulb, Clipboard, FileText, Zap, GraduationCap, Play, Clock, ChevronLeft, Share2, Lock, CheckCircle, Filter, X, BookOpen, Pen, Trash2, Download, Globe2 } from "lucide-react";
+import { LayoutDashboard, Users, Target, Megaphone, Brain, Lightbulb, Clipboard, FileText, Zap, GraduationCap, Play, Clock, ChevronLeft, Share2, Lock, CheckCircle, Filter, X, BookOpen, Pen, Trash2, Download, Globe2, ExternalLink, Headphones, BookMarked, Sparkles, ChevronDown, Library } from "lucide-react";
 
 const LOGO = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='40'%3E%3Ctext x='17' y='28' font-family='sans-serif' font-size='13' font-weight='900' fill='%23E2DD9F' text-anchor='middle'%3EBAM%3C/text%3E%3C/svg%3E";
 const GOLD = "#E2DD9F";
@@ -47,6 +47,7 @@ const NAV = [
   { id:"master",    label:"Masterclasses",     Icon:GraduationCap,   group:"lib" },
   { id:"workouts",  label:"Full Workouts",     Icon:Zap,             group:"lib" },
   { id:"playbook",  label:"Playbook Builder",  Icon:BookOpen,        group:"lib" },
+  { id:"resources", label:"Resources",         Icon:Library,         group:"main" },
 ];
 
 // Thumb colors per section
@@ -3736,6 +3737,176 @@ function MyProfilePanel({C, dark, onClose}){
   );
 }
 
+// ── RESOURCES PAGE ────────────────────────────────────────────────────────
+
+const BAM_PRODUCTS = [
+  { id:"blueprint", title:"Modern Basketball Blueprint", img:"/images/blueprint.jpg", url:"https://byanymeanscoaches.com/blueprint-book", desc:"A comprehensive guide to building a modern basketball program from the ground up. Covers philosophy, practice design, player development frameworks, and more." },
+  { id:"deep-skill", title:"Deep Skill", img:"/images/deep-skill.png", url:"https://byanymeanscoaches.com/deep-skill", desc:"Master the science of skill acquisition. Learn constraint-led approaches, differential learning, and how to design training environments that accelerate development." },
+  { id:"certification", title:"Coaches Certification", img:"/images/certification.png", url:"https://byanymeanscoaches.com/certification", desc:"Get BAM certified. A structured program covering modern coaching methodology, with video modules, assessments, and a community of certified coaches." },
+  { id:"consulting", title:"Coaches Consulting", img:"/images/consulting.png", url:"https://byanymeanscoaches.com/education", desc:"1-on-1 and group consulting sessions with BAM coaches. Get personalized feedback on your program, practice plans, and coaching philosophy." },
+  { id:"retreats", title:"Retreats", img:"/images/retreats.png", url:"https://byanymeanscoaches.com/retreats", desc:"Immersive in-person coaching retreats. Network with like-minded coaches, attend workshops, and experience hands-on training sessions." },
+];
+
+const MOCK_PAPERS = [
+  { id:1, title:"Constraints-Led Approach to Skill Acquisition in Sport", authors:"Davids, K., Button, C., & Bennett, S.", year:2008, journal:"International Journal of Sport Psychology", abstract:"This paper examines how manipulating task, environmental, and organismic constraints can guide learners toward functional movement solutions without prescriptive instruction." },
+  { id:2, title:"Nonlinear Pedagogy in Skill Acquisition", authors:"Chow, J.Y., Davids, K., Button, C., & Renshaw, I.", year:2016, journal:"Routledge Research in Sport Science", abstract:"Explores how nonlinear pedagogy provides a framework for understanding skill acquisition as a complex, self-organizing process shaped by interacting constraints." },
+  { id:3, title:"Ecological Dynamics and Transfer of Learning in Sport", authors:"Rosalie, S.M. & Mueller, F.", year:2014, journal:"Sports Medicine", abstract:"Reviews the ecological dynamics approach to understanding how skills learned in practice transfer to competitive performance environments." },
+];
+
+const MOCK_BOOKS = [
+  { id:1, title:"The Talent Code", author:"Daniel Coyle", url:"https://www.amazon.com/Talent-Code-Greatness-Born-Grown/dp/055380684X", desc:"Unlocking the secret of skill development through deep practice, ignition, and master coaching." },
+  { id:2, title:"Range: Why Generalists Triumph in a Specialized World", author:"David Epstein", url:"https://www.amazon.com/Range-Generalists-Triumph-Specialized-World/dp/0735214484", desc:"Why breadth of experience and late specialization often outperform early, narrow focus in sports and beyond." },
+  { id:3, title:"Bounce: Mozart, Federer, Picasso, Beckham, and the Science of Success", author:"Matthew Syed", url:"https://www.amazon.com/Bounce-Mozart-Federer-Picasso-Beckham/dp/0061723762", desc:"A former Olympic athlete examines the role of practice, mindset, and opportunity in achieving greatness." },
+];
+
+function ResourcesPage({C, dark}){
+  const [expanded, setExpanded] = useState(null);
+  const [summaries, setSummaries] = useState({});
+  const [loadingSummary, setLoadingSummary] = useState(null);
+
+  const toggleExpand = (id) => setExpanded(prev => prev === id ? null : id);
+
+  const generateSummary = async (paper) => {
+    if (summaries[paper.id]) return;
+    setLoadingSummary(paper.id);
+    try {
+      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.REACT_APP_ANTHROPIC_API_KEY || "",
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 300,
+          messages: [{ role: "user", content: `Summarize this research paper in 3-4 concise bullet points for basketball coaches. Title: "${paper.title}" by ${paper.authors} (${paper.year}). Abstract: ${paper.abstract}` }],
+        }),
+      });
+      const data = await resp.json();
+      const text = data?.content?.[0]?.text || "Summary unavailable.";
+      setSummaries(prev => ({ ...prev, [paper.id]: text }));
+    } catch {
+      setSummaries(prev => ({ ...prev, [paper.id]: "Failed to generate summary. Check your API key." }));
+    }
+    setLoadingSummary(null);
+  };
+
+  const sectionTitle = (text) => (
+    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:GOLD,letterSpacing:2,marginBottom:16,marginTop:36}}>{text}</div>
+  );
+
+  return (
+    <div style={{flex:1,overflow:"auto",padding:28}}>
+      <div style={{maxWidth:900,margin:"0 auto"}}>
+        <div style={{marginBottom:8}}>
+          <div style={{fontSize:24,fontWeight:800,color:C.text,letterSpacing:.5}}>Resources</div>
+          <div style={{fontSize:14,color:C.textDim,marginTop:4}}>Products, research, books, and tools to level up your coaching.</div>
+        </div>
+
+        {/* BAM Products */}
+        {sectionTitle("BAM PRODUCTS")}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:16}}>
+          {BAM_PRODUCTS.map(p=>(
+            <div key={p.id} style={{background:C.bgCard,border:`1px solid ${expanded===p.id?GOLD+"60":C.border}`,borderRadius:14,overflow:"hidden",cursor:"pointer",transition:"border-color .2s,box-shadow .2s",boxShadow:expanded===p.id?`0 0 0 2px ${GOLD}20`:"none"}}
+              onClick={()=>toggleExpand(p.id)}>
+              <div style={{height:160,background:`${dark?"#2A2A2A":"#E8E8E8"}`,overflow:"hidden",position:"relative"}}>
+                <img src={p.img} alt={p.title} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}
+                  onError={e=>{e.target.style.display="none";}} />
+                <div style={{position:"absolute",bottom:0,left:0,right:0,height:60,background:"linear-gradient(transparent,rgba(0,0,0,0.7))"}} />
+              </div>
+              <div style={{padding:"14px 16px"}}>
+                <div style={{fontSize:15,fontWeight:700,color:C.text,marginBottom:4}}>{p.title}</div>
+                <div style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:GOLD,fontWeight:600}}>
+                  {expanded===p.id?"Collapse":"Learn more"} <ChevronDown size={12} style={{transform:expanded===p.id?"rotate(180deg)":"none",transition:"transform .2s"}} />
+                </div>
+              </div>
+              {expanded===p.id&&(
+                <div style={{padding:"0 16px 16px"}} onClick={e=>e.stopPropagation()}>
+                  <div style={{fontSize:13,color:C.textMid,lineHeight:1.6,marginBottom:14}}>{p.desc}</div>
+                  <a href={p.url} target="_blank" rel="noopener noreferrer"
+                    style={{display:"inline-flex",alignItems:"center",gap:6,background:GOLD,color:"#111",padding:"8px 18px",borderRadius:8,fontSize:13,fontWeight:700,textDecoration:"none",fontFamily:"'DM Sans',sans-serif"}}>
+                    Visit <ExternalLink size={13} />
+                  </a>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Podcast */}
+        {sectionTitle("PODCAST")}
+        <div style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:14,padding:24,display:"flex",alignItems:"center",gap:20}}>
+          <div style={{width:64,height:64,borderRadius:14,background:dark?"#2A2A2A":"#E8E8E8",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            <Headphones size={28} color={GOLD} />
+          </div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:16,fontWeight:700,color:C.text,marginBottom:4}}>By Any Means Podcast</div>
+            <div style={{fontSize:13,color:C.textDim,marginBottom:12}}>Conversations on modern coaching, skill acquisition, and basketball culture.</div>
+            <div style={{display:"flex",gap:10}}>
+              <a href="https://open.spotify.com" target="_blank" rel="noopener noreferrer"
+                style={{display:"inline-flex",alignItems:"center",gap:6,background:"#1DB954",color:"#fff",padding:"7px 16px",borderRadius:20,fontSize:12,fontWeight:700,textDecoration:"none",fontFamily:"'DM Sans',sans-serif"}}>
+                Spotify
+              </a>
+              <a href="https://podcasts.apple.com" target="_blank" rel="noopener noreferrer"
+                style={{display:"inline-flex",alignItems:"center",gap:6,background:"#A855F7",color:"#fff",padding:"7px 16px",borderRadius:20,fontSize:12,fontWeight:700,textDecoration:"none",fontFamily:"'DM Sans',sans-serif"}}>
+                Apple Podcasts
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* Research Papers */}
+        {sectionTitle("RESEARCH PAPERS")}
+        <div style={{display:"grid",gap:12}}>
+          {MOCK_PAPERS.map(paper=>(
+            <div key={paper.id} style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:14,padding:20}}>
+              <div style={{fontSize:15,fontWeight:700,color:C.text,marginBottom:4}}>{paper.title}</div>
+              <div style={{fontSize:12,color:C.textDim,marginBottom:6}}>{paper.authors} ({paper.year}) &mdash; <em>{paper.journal}</em></div>
+              <div style={{fontSize:13,color:C.textMid,lineHeight:1.6,marginBottom:12}}>{paper.abstract}</div>
+              <button onClick={()=>generateSummary(paper)}
+                disabled={loadingSummary===paper.id || !!summaries[paper.id]}
+                style={{display:"inline-flex",alignItems:"center",gap:6,background:summaries[paper.id]?"transparent":dark?"rgba(226,221,159,0.10)":"rgba(226,221,159,0.25)",color:GOLD,padding:"7px 16px",borderRadius:8,fontSize:12,fontWeight:700,border:`1px solid ${GOLD}40`,cursor:summaries[paper.id]?"default":"pointer",fontFamily:"'DM Sans',sans-serif",opacity:summaries[paper.id]?0.5:1}}>
+                <Sparkles size={13} />
+                {loadingSummary===paper.id?"Generating...":summaries[paper.id]?"Summary Generated":"AI Summary"}
+              </button>
+              {summaries[paper.id]&&(
+                <div style={{marginTop:12,padding:14,background:dark?"rgba(226,221,159,0.06)":"rgba(226,221,159,0.12)",borderRadius:10,border:`1px solid ${GOLD}25`,fontSize:13,color:C.text,lineHeight:1.7,whiteSpace:"pre-wrap"}}>
+                  {summaries[paper.id]}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Books */}
+        {sectionTitle("RECOMMENDED BOOKS")}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:14,marginBottom:40}}>
+          {MOCK_BOOKS.map(book=>(
+            <div key={book.id} style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:14,padding:20}}>
+              <div style={{display:"flex",alignItems:"flex-start",gap:14}}>
+                <div style={{width:44,height:56,borderRadius:6,background:dark?"#2A2A2A":"#E8E8E8",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  <BookMarked size={20} color={GOLD} />
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:2}}>{book.title}</div>
+                  <div style={{fontSize:12,color:GOLD,marginBottom:6}}>{book.author}</div>
+                  <div style={{fontSize:12,color:C.textDim,lineHeight:1.5,marginBottom:10}}>{book.desc}</div>
+                  <a href={book.url} target="_blank" rel="noopener noreferrer"
+                    style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:12,fontWeight:700,color:GOLD,textDecoration:"none"}}>
+                    View on Amazon <ExternalLink size={11} />
+                  </a>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function BAMFull(){
   const [onboarded,setOnboarded]=useState(()=>{
     try{ return localStorage.getItem("onboardingComplete")==="true"; }catch(e){ return false; }
@@ -4198,6 +4369,11 @@ export default function BAMFull(){
                 )}
               </div>
             </div>
+          )}
+
+          {/* Resources */}
+          {nav==="resources"&&(
+            <ResourcesPage C={C} dark={dark}/>
           )}
 
           {/* Playbook Builder */}
