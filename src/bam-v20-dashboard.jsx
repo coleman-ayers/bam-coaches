@@ -925,10 +925,10 @@ function PracticePlansPage({ C, dark }) {
 
 // ── CONTENT PAGE ────────────────────────────────────────────────────────────
 function ContentPage({sectionId, C, dark, favDrills=[], toggleFav}){
-  if (sectionId === "plans") return <PracticePlansPage C={C} dark={dark}/>;
-  const section = CONTENT[sectionId];
   const [activeFilter, setActiveFilter] = useState("All");
   const [selectedItem, setSelectedItem] = useState(null);
+  if (sectionId === "plans") return <PracticePlansPage C={C} dark={dark}/>;
+  const section = CONTENT[sectionId];
   const navItem = NAV.find(n=>n.id===sectionId);
   const filtered = activeFilter==="All" ? section.items : section.items.filter(i=>i.tag===activeFilter);
 
