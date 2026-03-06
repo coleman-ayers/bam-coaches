@@ -593,19 +593,61 @@ const GOLD2 = "#C9C48B";
 const GOLD3 = "#B0AC78";
 const CHART_COLORS = [GOLD, GOLD2, GOLD3, "#9E9A65", "#8C8855", "#7A7645"];
 
+function readEvents() {
+  try { return JSON.parse(localStorage.getItem("bam_analytics_events") || "[]"); } catch { return []; }
+}
+
 function AnalyticsTab({ C }) {
   const { card: CARD, border: BORDER, text: TEXT, dim: DIM, mid: MID } = C;
   const cardStyle = mkCard(C);
-  // Mock data
+
+  const events = readEvents();
+
+  // ── Derived from real events ──
+
+  // Page views by section
+  const pvCounts = {};
+  events.filter(e => e.name === "page_view").forEach(e => { pvCounts[e.page] = (pvCounts[e.page] || 0) + 1; });
+  const pageViewData = Object.entries(pvCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([page, views]) => ({ page, views }));
+
+  // Top search terms
+  const termCounts = {};
+  events.filter(e => e.name === "search").forEach(e => {
+    const t = (e.term || "").toLowerCase();
+    if (t) termCounts[t] = (termCounts[t] || 0) + 1;
+  });
+  const topSearches = Object.entries(termCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([term, count]) => ({ term, count }));
+
+  // Most saved content
+  const saveCounts = {};
+  events.filter(e => e.name === "content_save").forEach(e => {
+    const key = `${e.section}:${e.contentId}`;
+    if (!saveCounts[key]) saveCounts[key] = { title: e.title || key, section: e.section, count: 0 };
+    saveCounts[key].count++;
+  });
+  const topSaved = Object.values(saveCounts).sort((a, b) => b.count - a.count).slice(0, 10);
+
+  // Avg session length
+  const sessionEnds = events.filter(e => e.name === "session_end" && typeof e.duration === "number");
+  const avgSession = sessionEnds.length
+    ? Math.round(sessionEnds.reduce((s, e) => s + e.duration, 0) / sessionEnds.length)
+    : 0;
+  const fmtDuration = avgSession >= 60 ? `${Math.floor(avgSession / 60)}m ${avgSession % 60}s` : `${avgSession}s`;
+
+  const totalSessions = events.filter(e => e.name === "session_start").length;
+  const totalPageViews = events.filter(e => e.name === "page_view").length;
+  const totalSearches = events.filter(e => e.name === "search").length;
+  const totalSaves = events.filter(e => e.name === "content_save").length;
+
+  // ── Mock data (existing) ──
   const growthData = Array.from({ length: 30 }, (_, i) => ({
     day: `Mar ${i + 1}`, members: 180 + Math.floor(i * 2.3 + Math.random() * 8),
   }));
-
-  const postsPerWeek = [
-    { week: "W1", posts: 34 }, { week: "W2", posts: 41 }, { week: "W3", posts: 38 },
-    { week: "W4", posts: 52 }, { week: "W5", posts: 47 }, { week: "W6", posts: 55 },
-    { week: "W7", posts: 61 }, { week: "W8", posts: 58 },
-  ];
 
   const roleBreakdown = [
     { name: "Skills Trainer", value: 42 }, { name: "Team Coach", value: 28 },
@@ -613,20 +655,13 @@ function AnalyticsTab({ C }) {
     { name: "Pro Coach", value: 4 },
   ];
 
-  const contentViews = [
-    { section: "PD Drills", views: 1240 }, { section: "Team", views: 890 },
-    { section: "Insights", views: 760 }, { section: "X&O", views: 620 },
-    { section: "Plans", views: 540 }, { section: "Master", views: 480 },
-    { section: "Workouts", views: 410 },
-  ];
-
   const stats = [
+    { label: "Total Sessions", value: String(totalSessions || 0) },
+    { label: "Total Page Views", value: String(totalPageViews || 0) },
+    { label: "Total Searches", value: String(totalSearches || 0) },
+    { label: "Total Saves", value: String(totalSaves || 0) },
+    { label: "Avg Session Length", value: fmtDuration || "—" },
     { label: "Total Members", value: "247" },
-    { label: "Unique Posters This Week", value: "38" },
-    { label: "Posts This Week", value: "58" },
-    { label: "Avg Comments/Post", value: "3.2" },
-    { label: "Top Contributor", value: "Marcus T." },
-    { label: "Churn Rate", value: "2.1%" },
   ];
 
   return (
@@ -643,37 +678,70 @@ function AnalyticsTab({ C }) {
         ))}
       </div>
 
-      {/* Charts Grid */}
+      {/* Charts & Lists Grid */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        {/* Member Growth */}
+        {/* Page Views by Section */}
         <div style={cardStyle}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: TEXT, marginBottom: 16 }}>Member Growth (30 Days)</div>
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={growthData}>
-              <CartesianGrid strokeDasharray="3 3" stroke={BORDER} />
-              <XAxis dataKey="day" tick={{ fill: DIM, fontSize: 10 }} interval={6} />
-              <YAxis tick={{ fill: DIM, fontSize: 10 }} />
-              <Tooltip contentStyle={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 12 }} />
-              <Line type="monotone" dataKey="members" stroke={GOLD} strokeWidth={2} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
+          <div style={{ fontSize: 13, fontWeight: 700, color: TEXT, marginBottom: 16 }}>Page Views by Section</div>
+          {pageViewData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={pageViewData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke={BORDER} />
+                <XAxis type="number" tick={{ fill: DIM, fontSize: 10 }} />
+                <YAxis dataKey="page" type="category" tick={{ fill: DIM, fontSize: 10 }} width={80} />
+                <Tooltip contentStyle={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 12 }} />
+                <Bar dataKey="views" fill={GOLD} radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div style={{ fontSize: 13, color: DIM, padding: "40px 0", textAlign: "center" }}>No page view data yet</div>
+          )}
         </div>
 
-        {/* Posts Per Week */}
+        {/* Top Search Terms */}
         <div style={cardStyle}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: TEXT, marginBottom: 16 }}>Community Posts (8 Weeks)</div>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={postsPerWeek}>
-              <CartesianGrid strokeDasharray="3 3" stroke={BORDER} />
-              <XAxis dataKey="week" tick={{ fill: DIM, fontSize: 10 }} />
-              <YAxis tick={{ fill: DIM, fontSize: 10 }} />
-              <Tooltip contentStyle={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 12 }} />
-              <Bar dataKey="posts" fill={GOLD} radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <div style={{ fontSize: 13, fontWeight: 700, color: TEXT, marginBottom: 16 }}>Top Search Terms</div>
+          {topSearches.length > 0 ? (
+            <div style={{ maxHeight: 220, overflowY: "auto" }}>
+              {topSearches.map((s, i) => (
+                <div key={s.term} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: `1px solid ${BORDER}` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: GOLD, width: 20, textAlign: "right" }}>#{i + 1}</span>
+                    <span style={{ fontSize: 13, color: TEXT }}>{s.term}</span>
+                  </div>
+                  <span style={{ fontSize: 12, color: MID, fontWeight: 600 }}>{s.count}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, color: DIM, padding: "40px 0", textAlign: "center" }}>No search data yet</div>
+          )}
         </div>
 
-        {/* Role Breakdown */}
+        {/* Most Saved Content */}
+        <div style={cardStyle}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: TEXT, marginBottom: 16 }}>Most Saved Content</div>
+          {topSaved.length > 0 ? (
+            <div style={{ maxHeight: 220, overflowY: "auto" }}>
+              {topSaved.map((s, i) => (
+                <div key={`${s.section}-${s.title}`} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: `1px solid ${BORDER}` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: GOLD, width: 20, textAlign: "right", flexShrink: 0 }}>#{i + 1}</span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13, color: TEXT, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.title}</div>
+                      <div style={{ fontSize: 10, color: DIM }}>{s.section}</div>
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 12, color: MID, fontWeight: 600, flexShrink: 0 }}>{s.count} save{s.count !== 1 ? "s" : ""}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, color: DIM, padding: "40px 0", textAlign: "center" }}>No saves yet</div>
+          )}
+        </div>
+
+        {/* Member Roles (existing mock) */}
         <div style={cardStyle}>
           <div style={{ fontSize: 13, fontWeight: 700, color: TEXT, marginBottom: 16 }}>Member Roles</div>
           <ResponsiveContainer width="100%" height={220}>
@@ -688,17 +756,17 @@ function AnalyticsTab({ C }) {
           </ResponsiveContainer>
         </div>
 
-        {/* Content Views */}
-        <div style={cardStyle}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: TEXT, marginBottom: 16 }}>Content Views by Section</div>
+        {/* Member Growth (existing mock) */}
+        <div style={{ ...cardStyle, gridColumn: "1 / -1" }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: TEXT, marginBottom: 16 }}>Member Growth (30 Days)</div>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={contentViews} layout="vertical">
+            <LineChart data={growthData}>
               <CartesianGrid strokeDasharray="3 3" stroke={BORDER} />
-              <XAxis type="number" tick={{ fill: DIM, fontSize: 10 }} />
-              <YAxis dataKey="section" type="category" tick={{ fill: DIM, fontSize: 10 }} width={70} />
+              <XAxis dataKey="day" tick={{ fill: DIM, fontSize: 10 }} interval={6} />
+              <YAxis tick={{ fill: DIM, fontSize: 10 }} />
               <Tooltip contentStyle={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 12 }} />
-              <Bar dataKey="views" fill={GOLD2} radius={[0, 4, 4, 0]} />
-            </BarChart>
+              <Line type="monotone" dataKey="members" stroke={GOLD} strokeWidth={2} dot={false} />
+            </LineChart>
           </ResponsiveContainer>
         </div>
       </div>

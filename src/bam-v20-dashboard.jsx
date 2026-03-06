@@ -4,6 +4,15 @@ import { LayoutDashboard, Users, Target, Megaphone, Brain, Lightbulb, Clipboard,
 const LOGO = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='40'%3E%3Ctext x='17' y='28' font-family='sans-serif' font-size='13' font-weight='900' fill='%23E2DD9F' text-anchor='middle'%3EBAM%3C/text%3E%3C/svg%3E";
 const GOLD = "#E2DD9F";
 
+// ── ANALYTICS HELPER ───────────────────────────────────────────────────────
+function logEvent(name, data = {}) {
+  try {
+    const events = JSON.parse(localStorage.getItem("bam_analytics_events") || "[]");
+    events.push({ name, ...data, ts: Date.now() });
+    localStorage.setItem("bam_analytics_events", JSON.stringify(events));
+  } catch {}
+}
+
 const DARK = {
   bg:"#1A1A1A", bgCard:"#242424", bgHover:"#2E2E2E",
   border:"#333", gold:GOLD, goldDim:"rgba(226,221,159,0.10)",
@@ -531,7 +540,7 @@ Return the 4 most relevant drills. Index must match the drill list index exactly
             background:dark?"#2E2E2E":"#F6F6F6", borderRadius:8,
             border:`1px solid ${dark?"#3D3D3D":"#E8E8E8"}`, padding:"7px 13px" }}>
             <Filter size={12} color={dark?"#666":"#aaa"}/>
-            <input value={search} onChange={e => { setSearch(e.target.value); setAiResults(null); }}
+            <input value={search} onChange={e => { const v=e.target.value; setSearch(v); setAiResults(null); if(v.trim()) logEvent("search",{term:v.trim()}); }}
               placeholder="Or search all drills..."
               style={{ flex:1, background:"transparent", border:"none", outline:"none",
                 fontSize:13, color:dark?"#F2F2F2":"#111", fontFamily:"'DM Sans',sans-serif" }}/>
@@ -3735,6 +3744,15 @@ export default function BAMFull(){
   const [tourActive,setTourActive]=useState(false);
   const [loading,setLoading]=useState(true);
   useEffect(()=>{ const t=setTimeout(()=>setLoading(false),1800); return ()=>clearTimeout(t); },[]);
+  // Analytics: session tracking
+  const sessionStartRef=useRef(Date.now());
+  useEffect(()=>{
+    logEvent("session_start",{});
+    logEvent("page_view",{page:"dashboard"});
+    const onUnload=()=>logEvent("session_end",{duration:Math.round((Date.now()-sessionStartRef.current)/1000)});
+    window.addEventListener("beforeunload",onUnload);
+    return ()=>window.removeEventListener("beforeunload",onUnload);
+  },[]);
   // dashIntro = true only on very first visit this session
   const [dashIntro,setDashIntro]=useState(()=>{
     try{ return !sessionStorage.getItem("bam_dash_seen"); }catch(e){ return false; }
@@ -3764,7 +3782,9 @@ export default function BAMFull(){
   const [mapOpen,setMapOpen]=useState(false);
   const toggleFav=(item,sectionId)=>setFavDrills(prev=>{
     const key=`${sectionId}-${item.id}`;
-    return prev.find(f=>f.key===key) ? prev.filter(f=>f.key!==key) : [...prev,{...item,key,sectionId}];
+    const removing=prev.find(f=>f.key===key);
+    if(!removing) logEvent("content_save",{contentId:item.id,section:sectionId,title:item.title});
+    return removing ? prev.filter(f=>f.key!==key) : [...prev,{...item,key,sectionId}];
   });
   const ptsRef=useRef(null);
   const scrollRef=useRef(null);
@@ -3783,7 +3803,7 @@ export default function BAMFull(){
     return ()=>ob.disconnect();
   },[nav]);
 
-  const go=(id)=>{ if(id===nav) return; setNav(id); setPageKey(k=>k+1); setPtsVis(false); setActiveTag("All"); };
+  const go=(id)=>{ if(id===nav) return; setNav(id); setPageKey(k=>k+1); setPtsVis(false); setActiveTag("All"); logEvent("page_view",{page:id}); };
   const cyclePrompt=()=>{ setPVis(false); setTimeout(()=>{ setPIdx(i=>(i+1)%PROMPTS.length); setPVis(true); },360); };
 
   const NAV_SECTIONS = [
