@@ -3325,6 +3325,16 @@ export default function BAMFull(){
   const [dark,setDark]=useState(true);
   const [loading,setLoading]=useState(true);
   useEffect(()=>{ const t=setTimeout(()=>setLoading(false),1800); return ()=>clearTimeout(t); },[]);
+  const [onboarded,setOnboarded]=useState(()=>{
+    try{ return !!sessionStorage.getItem("bam_onboarded"); }catch(e){ return false; }
+  });
+  const [obName,setObName]=useState("");
+  const [obCountry,setObCountry]=useState("");
+  const [obCity,setObCity]=useState("");
+  const finishOnboarding=()=>{
+    try{ sessionStorage.setItem("bam_onboarded","1"); }catch(e){}
+    setOnboarded(true);
+  };
   // dashIntro = true only on very first visit this session
   const [dashIntro,setDashIntro]=useState(()=>{
     try{ return !sessionStorage.getItem("bam_dash_seen"); }catch(e){ return false; }
@@ -3398,6 +3408,37 @@ export default function BAMFull(){
         style={{width:60,height:75,objectFit:"contain",filter:"drop-shadow(0 0 18px rgba(226,221,159,0.35))"}}
       />
       <div style={{marginTop:28,fontSize:18,fontWeight:900,letterSpacing:4,color:GOLD,textTransform:"uppercase"}}>YOU'RE IN.</div>
+    </div>
+  );
+
+  if (!onboarded) return (
+    <div style={{fontFamily:"'DM Sans',sans-serif",background:"#1A1A1A",height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+      <div style={{width:340,display:"flex",flexDirection:"column",alignItems:"stretch"}}>
+        <div style={{textAlign:"center",marginBottom:36}}>
+          <div style={{fontSize:22,fontWeight:900,color:GOLD,letterSpacing:1,marginBottom:6}}>Set up your profile</div>
+          <div style={{fontSize:13,color:"#888"}}>Tell us a little about yourself.</div>
+        </div>
+
+        <label style={{fontSize:10,fontWeight:700,color:"#888",letterSpacing:1.2,textTransform:"uppercase",marginBottom:6}}>Full name</label>
+        <input value={obName} onChange={e=>setObName(e.target.value)} placeholder="Your name"
+          style={{width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(226,221,159,0.25)",borderRadius:8,padding:"10px 14px",fontSize:14,color:"#F5F0E8",outline:"none",fontFamily:"inherit",marginBottom:18}}/>
+
+        <label style={{fontSize:10,fontWeight:700,color:"#888",letterSpacing:1.2,textTransform:"uppercase",marginBottom:6}}>Country</label>
+        <select value={obCountry} onChange={e=>setObCountry(e.target.value)}
+          style={{width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(226,221,159,0.25)",borderRadius:8,padding:"10px 14px",fontSize:14,color:obCountry?"#F5F0E8":"#666",outline:"none",fontFamily:"inherit",marginBottom:18,appearance:"none",WebkitAppearance:"none",backgroundImage:`url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,backgroundRepeat:"no-repeat",backgroundPosition:"right 14px center"}}>
+          <option value="" disabled>Select country</option>
+          {["United States","Canada","United Kingdom","Australia","Nigeria","Ghana","Japan","Spain","France","Germany","Brazil","Mexico","South Africa","India","Philippines","South Korea","China","Italy","Netherlands","Sweden"].map(c=><option key={c} value={c} style={{background:"#2A2A2A",color:"#F5F0E8"}}>{c}</option>)}
+        </select>
+
+        <label style={{fontSize:10,fontWeight:700,color:"#888",letterSpacing:1.2,textTransform:"uppercase",marginBottom:6}}>City</label>
+        <input value={obCity} onChange={e=>setObCity(e.target.value)} placeholder="Your city"
+          style={{width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(226,221,159,0.25)",borderRadius:8,padding:"10px 14px",fontSize:14,color:"#F5F0E8",outline:"none",fontFamily:"inherit",marginBottom:32}}/>
+
+        <div className="btn" onClick={()=>{ if(obName.trim()) finishOnboarding(); }}
+          style={{width:"100%",boxSizing:"border-box",textAlign:"center",padding:"12px 0",background:obName.trim()?GOLD:"rgba(226,221,159,0.25)",borderRadius:9,fontSize:14,fontWeight:800,color:"#111",cursor:obName.trim()?"pointer":"default",boxShadow:obName.trim()?`0 4px 14px ${GOLD}44`:"none",transition:"background .2s,box-shadow .2s"}}>
+          Continue
+        </div>
+      </div>
     </div>
   );
 
