@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { LayoutDashboard, Users, Target, Megaphone, Brain, Lightbulb, Clipboard, FileText, Zap, GraduationCap, Play, Clock, ChevronLeft, Share2, Lock, CheckCircle, Filter, X, BookOpen, Pen, Trash2, Download, Globe2, ExternalLink, Headphones, BookMarked, Sparkles, ChevronDown, Library, Video, CalendarDays } from "lucide-react";
+import { LayoutDashboard, Users, Target, Megaphone, Brain, Lightbulb, Clipboard, FileText, Zap, GraduationCap, Play, Clock, ChevronLeft, Share2, Lock, CheckCircle, Filter, X, BookOpen, Pen, Trash2, Download, Globe2, ExternalLink, Headphones, BookMarked, Sparkles, ChevronDown, Library, Video, CalendarDays, GripVertical, Plus, ChevronUp, ChevronRight, Save, Type } from "lucide-react";
 
 const LOGO = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='40'%3E%3Ctext x='17' y='28' font-family='sans-serif' font-size='13' font-weight='900' fill='%23E2DD9F' text-anchor='middle'%3EBAM%3C/text%3E%3C/svg%3E";
 const GOLD = "#E2DD9F";
@@ -282,6 +282,13 @@ const css = `
 .profile-row:hover svg{stroke:rgba(226,221,159,0.7)!important;}
 @keyframes pulseMicro{0%,100%{opacity:.55;transform:scale(0.92);}50%{opacity:1;transform:scale(1.06);}}
 .micro-pulse{animation:pulseMicro 1.6s ease-in-out infinite;}
+.pp-block{transition:transform .2s ease,box-shadow .2s ease,margin .25s ease,opacity .2s ease;}
+.pp-block:hover{transform:scale(1.008);}
+.pp-block.dragging{opacity:.35;transform:scale(.96);}
+.pp-drop-zone{transition:height .25s ease,opacity .25s ease;overflow:hidden;}
+.pp-drill-item{transition:transform .15s ease,box-shadow .15s ease,opacity .15s ease;}
+.pp-drill-item:hover{transform:scale(1.01);}
+.pp-drill-item.dragging{opacity:.3;transform:scale(.95);}
 `;
 
 // ── MINI ICONS ──────────────────────────────────────────────────────────────
@@ -419,560 +426,814 @@ function ContentDetail({item, sectionId, C, dark, onClose}){
 
 
 // ── PRACTICE PLANS PAGE ───────────────────────────────────────────────────
-const BLOCK_TYPES = [
-  { id:"warmup",       label:"Warm-Up",          color:"#5B7FA6", emoji:"🔥" },
-  { id:"ballhandling", label:"Ball Handling",     color:"#6B9E7A", emoji:"⚡" },
-  { id:"shooting",     label:"Shooting",          color:"#9E8A5B", emoji:"🎯" },
-  { id:"skill",        label:"Skill Work",        color:"#7A6B9E", emoji:"🏀" },
-  { id:"competitive",  label:"Competitive Game",  color:"#9E6B7A", emoji:"🏆" },
-  { id:"defensive",    label:"Defensive Drill",   color:"#C47878", emoji:"🛡️" },
-  { id:"team",         label:"Team Concepts",     color:"#5B9E8A", emoji:"🤝" },
-  { id:"conditioning", label:"Conditioning",      color:"#9E7A5B", emoji:"💪" },
-  { id:"film",         label:"Film / Debrief",    color:"#6B7A9E", emoji:"📽️" },
-  { id:"cooldown",     label:"Cool-Down",         color:"#7A9E7A", emoji:"🧊" },
+
+const BLOCK_CATEGORIES = [
+  { id:"warmup",        label:"Warmup / Movement",   color:"#5B7FA6", icon:"warmup",     contentTags:["All"], subs:[] },
+  { id:"pd",            label:"Player Development",   color:"#6B9E7A", icon:"pd",         contentTags:[], subs:[
+    { id:"pd-handles",    label:"Ballhandling Work",    contentSections:["pd"], contentTags:["Handles"] },
+    { id:"pd-shooting",   label:"Shooting Training",    contentSections:["pd"], contentTags:["Shooting","Finishing"] },
+    { id:"pd-iq",         label:"IQ Building & Passing",contentSections:["pd","insights"], contentTags:["1v1","Decision"] },
+    { id:"pd-defense",    label:"Defensive Work",       contentSections:["pd"], contentTags:["Defense"] },
+    { id:"pd-pdp",        label:"Play-Drill-Play",      contentSections:["pd","team"], contentTags:["Competitive","All"], isPDP:true },
+    { id:"pd-general",    label:"General Player Dev",   contentSections:["pd"], contentTags:["All"] },
+  ]},
+  { id:"team-block",     label:"Team Block",           color:"#9E6B7A", icon:"team",       contentTags:[], subs:[
+    { id:"team-transition",label:"Transition",           contentSections:["team"], contentTags:["Transition"] },
+    { id:"team-hco",      label:"Half-Court Offense",    contentSections:["team","xo"], contentTags:["Offense","Sets","Half Court"] },
+    { id:"team-scrimmage", label:"Scrimmage",            contentSections:["team"], contentTags:["5v5","Competitive"] },
+    { id:"team-ssg",      label:"Decision-Making SSGs",  contentSections:["team"], contentTags:["Competitive","All"] },
+    { id:"team-defense",  label:"Defense",               contentSections:["team"], contentTags:["Defense"] },
+  ]},
+  { id:"conditioning",   label:"Conditioning",         color:"#9E7A5B", icon:"conditioning",contentTags:["All"], subs:[] },
+  { id:"film",           label:"Film",                 color:"#6B7A9E", icon:"film",       contentTags:["All"], subs:[] },
+  { id:"cooldown",       label:"Cool Down",            color:"#7A9E7A", icon:"cooldown",   contentTags:["All"], subs:[] },
+  { id:"custom",         label:"Custom Block",         color:"#888888", icon:"custom",     contentTags:["All"], subs:[], isCustom:true },
 ];
+
+const BLOCK_ICON_MAP = {
+  warmup: (c,s)=><Target size={s} color={c}/>,
+  pd: (c,s)=><Zap size={s} color={c}/>,
+  team: (c,s)=><Users size={s} color={c}/>,
+  conditioning: (c,s)=><Clock size={s} color={c}/>,
+  film: (c,s)=><Play size={s} color={c}/>,
+  cooldown: (c,s)=><ChevronDown size={s} color={c}/>,
+  custom: (c,s)=><Type size={s} color={c}/>,
+};
+
+const DURATION_PRESETS = [5,10,15,20,25,30];
 
 // Flatten all drills from content library for search
 const ALL_DRILLS = Object.entries(CONTENT).flatMap(([section, data]) =>
   (data.items || []).map(item => ({ ...item, section, sectionLabel: data.title }))
 );
 
+// Find the parent category and sub-type for a block type id
+function findBlockMeta(typeId) {
+  for (const cat of BLOCK_CATEGORIES) {
+    if (cat.id === typeId) return { category: cat, sub: null };
+    const sub = cat.subs.find(s => s.id === typeId);
+    if (sub) return { category: cat, sub };
+  }
+  return { category: BLOCK_CATEGORIES[0], sub: null };
+}
+
+// Filter drills relevant to a block type
+function getDrillsForBlock(typeId) {
+  const { category, sub } = findBlockMeta(typeId);
+  if (sub) {
+    const sections = sub.contentSections || [];
+    const tags = sub.contentTags || [];
+    return ALL_DRILLS.filter(d => {
+      if (sections.length > 0 && !sections.includes(d.section)) return false;
+      if (tags.includes("All")) return true;
+      return tags.some(t => d.tag?.includes(t) || d.title?.toLowerCase().includes(t.toLowerCase()));
+    });
+  }
+  return ALL_DRILLS;
+}
+
 const PLAN_TEMPLATES = {
   "60min": [
-    { type:"warmup",      duration:10, goal:"Activate players physically and mentally", drills:[] },
-    { type:"shooting",    duration:15, goal:"Build catch-and-shoot confidence", drills:[] },
-    { type:"skill",       duration:15, goal:"Develop finishing under contact", drills:[] },
-    { type:"competitive", duration:15, goal:"Apply reads in live reps", drills:[] },
-    { type:"film",        duration:5,  goal:"Reinforce key coaching points", drills:[] },
+    { type:"warmup",      duration:10, notes:"Activate players physically and mentally" },
+    { type:"pd-shooting", duration:15, notes:"Build catch-and-shoot confidence" },
+    { type:"pd-general",  duration:15, notes:"Develop finishing under contact" },
+    { type:"team-ssg",    duration:15, notes:"Apply reads in live reps" },
+    { type:"film",        duration:5,  notes:"Reinforce key coaching points" },
   ],
   "90min": [
-    { type:"warmup",      duration:15, goal:"Position-specific activation", drills:[] },
-    { type:"shooting",    duration:20, goal:"Shooting off movement", drills:[] },
-    { type:"defensive",   duration:20, goal:"Build team defensive habits", drills:[] },
-    { type:"team",        duration:20, goal:"Install one offensive action", drills:[] },
-    { type:"competitive", duration:10, goal:"5v5 with coaching overlay", drills:[] },
-    { type:"film",        duration:5,  goal:"Debrief and reinforce", drills:[] },
+    { type:"warmup",       duration:15, notes:"Position-specific activation" },
+    { type:"pd-shooting",  duration:20, notes:"Shooting off movement" },
+    { type:"team-defense", duration:20, notes:"Build team defensive habits" },
+    { type:"team-hco",     duration:20, notes:"Install one offensive action" },
+    { type:"team-scrimmage",duration:10,notes:"5v5 with coaching overlay" },
+    { type:"film",         duration:5,  notes:"Debrief and reinforce" },
   ],
   "blank": [],
 };
 
 let blockIdCounter = 100;
-const newBlock = (type) => ({
+const newBlock = (typeId, overrides = {}) => ({
   id: ++blockIdCounter,
-  type,
+  type: typeId,
+  customName: "",
   duration: 10,
-  goal: "",
+  notes: "",
   drills: [],
+  ...overrides,
 });
 
-// ── DRILL PICKER MODAL ─────────────────────────────────────────────────────
-function DrillPicker({ block, C, dark, onClose, onAddDrill, onRemoveDrill }) {
-  const bt = BLOCK_TYPES.find(b => b.id === block.type) || BLOCK_TYPES[0];
-  const [goal, setGoal] = useState(block.goal || "");
+// ── DRILL SEARCH PANEL (right column) ──────────────────────────────────────
+function DrillSearchPanel({ block, C, dark, onAddDrill, onRemoveDrill }) {
+  const { category, sub } = findBlockMeta(block.type);
   const [search, setSearch] = useState("");
-  const [aiResults, setAiResults] = useState(null);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState(null);
+  const color = category.color;
+  const label = sub ? sub.label : category.label;
 
-  // Filter drills by search
-  const searchFiltered = ALL_DRILLS.filter(d => {
+  const relevantDrills = getDrillsForBlock(block.type);
+  const filtered = relevantDrills.filter(d => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return d.title.toLowerCase().includes(q) || d.tag?.toLowerCase().includes(q) || d.desc?.toLowerCase().includes(q);
-  }).slice(0, 12);
-
-  const suggestedDrills = aiResults || searchFiltered;
-
-  const askAI = async () => {
-    if (!goal.trim()) return;
-    setAiLoading(true);
-    setAiError(null);
-    setAiResults(null);
-
-    const drillList = ALL_DRILLS.map((d, i) =>
-      `${i}: "${d.title}" (${d.sectionLabel}, ${d.tag}, ${d.level}) — ${d.desc?.slice(0,80)}`
-    ).join("\n");
-
-    try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          system: `You are a basketball coaching assistant helping coaches build practice plans. 
-You will be given a coaching goal and a list of available drills. 
-Return ONLY a JSON array of objects with this exact shape, no markdown, no explanation:
-[{"index": <number>, "reason": "<one sentence why this drill fits the goal>"}]
-Return the 4 most relevant drills. Index must match the drill list index exactly.`,
-          messages: [{
-            role: "user",
-            content: `Block type: ${bt.label}\nCoaching goal: "${goal}"\n\nAvailable drills:\n${drillList}\n\nReturn the 4 best matches as JSON.`
-          }]
-        })
-      });
-      const data = await res.json();
-      const raw = data.content?.find(b => b.type === "text")?.text || "[]";
-      const clean = raw.replace(/```json|```/g, "").trim();
-      const parsed = JSON.parse(clean);
-      const results = parsed.map(r => ({
-        ...ALL_DRILLS[r.index],
-        aiReason: r.reason,
-      })).filter(Boolean);
-      setAiResults(results);
-    } catch(e) {
-      setAiError("Couldn't load suggestions. Try searching manually.");
-    }
-    setAiLoading(false);
-  };
+  }).slice(0, 20);
 
   return (
-    <div style={{
-      position:"fixed", inset:0, zIndex:2000,
-      background:"rgba(0,0,0,0.65)", backdropFilter:"blur(4px)",
-      display:"flex", alignItems:"center", justifyContent:"center",
-    }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{
-        width:640, maxHeight:"82vh", borderRadius:16,
-        background: dark?"#242424":"#fff",
-        border:`1px solid ${dark?"#3D3D3D":"#E8E8E8"}`,
-        boxShadow:"0 24px 80px rgba(0,0,0,0.5)",
-        display:"flex", flexDirection:"column",
-        animation:"popIn .2s ease both",
-      }}>
-        {/* Header */}
-        <div style={{ padding:"18px 20px 14px", borderBottom:`1px solid ${dark?"#333":"#eee"}`, flexShrink:0 }}>
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:9 }}>
-              <div style={{ width:32, height:32, borderRadius:8, background:bt.color+"33",
-                border:`1px solid ${bt.color}55`, display:"flex", alignItems:"center",
-                justifyContent:"center", fontSize:16 }}>{bt.emoji}</div>
-              <div>
-                <div style={{ fontSize:15, fontWeight:800, color:dark?"#F2F2F2":"#111" }}>{bt.label}</div>
-                <div style={{ fontSize:11, color:dark?"#666":"#aaa" }}>Add drills to this block</div>
+    <div style={{ display:"flex", flexDirection:"column", height:"100%" }}>
+      {/* Header */}
+      <div style={{ padding:"16px 18px 12px", borderBottom:`1px solid ${C.border}`, flexShrink:0 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
+          <div style={{ width:28, height:28, borderRadius:7, background:color+"25", border:`1px solid ${color}50`,
+            display:"flex", alignItems:"center", justifyContent:"center" }}>
+            {(BLOCK_ICON_MAP[category.icon] || BLOCK_ICON_MAP.custom)(color, 14)}
+          </div>
+          <div>
+            <div style={{ fontSize:13, fontWeight:800, color:C.text }}>{label}</div>
+            <div style={{ fontSize:10, color:C.textDim }}>{relevantDrills.length} matching drills</div>
+          </div>
+        </div>
+        <div style={{ display:"flex", alignItems:"center", gap:8,
+          background:C.bgHover, borderRadius:8, border:`1px solid ${C.border}`, padding:"7px 12px" }}>
+          <Filter size={12} color={C.textDim}/>
+          <input value={search} onChange={e => { setSearch(e.target.value); if(e.target.value.trim()) logEvent("search",{term:e.target.value.trim()}); }}
+            placeholder="Search drills..."
+            style={{ flex:1, background:"transparent", border:"none", outline:"none",
+              fontSize:13, color:C.text, fontFamily:"'DM Sans',sans-serif" }}/>
+          {search && <div className="btn" onClick={() => setSearch("")}><X size={11} color={C.textDim}/></div>}
+        </div>
+      </div>
+
+      {/* Drill list */}
+      <div style={{ flex:1, overflowY:"auto", padding:"8px 14px 14px" }}>
+        {filtered.length === 0 && (
+          <div style={{ textAlign:"center", padding:"40px 0", color:C.textDim, fontSize:13 }}>No drills found.</div>
+        )}
+        {filtered.map(drill => {
+          const alreadyAdded = block.drills.some(d => d.id === drill.id && d.section === drill.section);
+          const thumbColor = (SECTION_COLORS[drill.section] || SECTION_COLORS.pd)[drill.id % 8];
+          return (
+            <div key={`${drill.section}-${drill.id}`} style={{
+              display:"flex", gap:10, alignItems:"center",
+              padding:"10px 11px", borderRadius:9, marginBottom:6,
+              background: alreadyAdded ? (dark?"rgba(226,221,159,0.08)":"rgba(226,221,159,0.15)") : C.bgHover,
+              border:`1px solid ${alreadyAdded ? GOLD+"50" : C.border}`,
+              cursor:"pointer", transition:"all .15s",
+            }} onClick={() => alreadyAdded ? onRemoveDrill(drill) : onAddDrill(drill)}>
+              <div style={{ width:40, height:40, borderRadius:7, background:thumbColor,
+                display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                <Play size={12} color="rgba(255,255,255,0.8)" fill="rgba(255,255,255,0.8)"/>
+              </div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:C.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{drill.title}</div>
+                <div style={{ fontSize:10, color:C.textDim }}>{drill.sectionLabel} · {drill.tag} · {drill.duration}</div>
+              </div>
+              <div style={{ flexShrink:0, width:26, height:26, borderRadius:7,
+                background: alreadyAdded ? GOLD : "transparent",
+                border:`1px solid ${alreadyAdded ? GOLD : C.border}`,
+                display:"flex", alignItems:"center", justifyContent:"center" }}>
+                {alreadyAdded
+                  ? <CheckCircle size={13} color="#111"/>
+                  : <Plus size={13} color={C.textDim}/>
+                }
               </div>
             </div>
-            <div className="btn" onClick={onClose}><X size={15} color={dark?"#666":"#aaa"}/></div>
-          </div>
-
-          {/* Goal input + AI button */}
-          <div style={{ display:"flex", gap:8 }}>
-            <div style={{ flex:1, display:"flex", alignItems:"center", gap:8,
-              background:dark?"#2E2E2E":"#F6F6F6", borderRadius:9,
-              border:`1px solid ${dark?"#3D3D3D":"#E0E0E0"}`, padding:"8px 13px" }}>
-              <Brain size={13} color={GOLD}/>
-              <input value={goal} onChange={e => setGoal(e.target.value)}
-                onKeyDown={e => e.key==="Enter" && askAI()}
-                placeholder="Describe your goal for this block..."
-                style={{ flex:1, background:"transparent", border:"none", outline:"none",
-                  fontSize:13, color:dark?"#F2F2F2":"#111", fontFamily:"'DM Sans',sans-serif" }}/>
-            </div>
-            <div className="btn" onClick={askAI}
-              style={{ padding:"8px 16px", borderRadius:9, background:GOLD,
-                color:"#111", fontSize:13, fontWeight:800, display:"flex",
-                alignItems:"center", gap:6, flexShrink:0,
-                opacity: goal.trim() ? 1 : 0.45,
-                boxShadow: goal.trim() ? `0 4px 14px ${GOLD}44` : "none" }}>
-              {aiLoading
-                ? <><div style={{ width:12, height:12, borderRadius:"50%", border:"2px solid #111", borderTopColor:"transparent", animation:"spin 0.7s linear infinite" }}/> Thinking</>
-                : <><Brain size={13} color="#111"/> Suggest</>}
-            </div>
-          </div>
-        </div>
-
-        {/* Search bar */}
-        <div style={{ padding:"12px 20px 8px", flexShrink:0, borderBottom:`1px solid ${dark?"#2E2E2E":"#f0f0f0"}` }}>
-          <div style={{ display:"flex", alignItems:"center", gap:8,
-            background:dark?"#2E2E2E":"#F6F6F6", borderRadius:8,
-            border:`1px solid ${dark?"#3D3D3D":"#E8E8E8"}`, padding:"7px 13px" }}>
-            <Filter size={12} color={dark?"#666":"#aaa"}/>
-            <input value={search} onChange={e => { const v=e.target.value; setSearch(v); setAiResults(null); if(v.trim()) logEvent("search",{term:v.trim()}); }}
-              placeholder="Or search all drills..."
-              style={{ flex:1, background:"transparent", border:"none", outline:"none",
-                fontSize:13, color:dark?"#F2F2F2":"#111", fontFamily:"'DM Sans',sans-serif" }}/>
-            {search && <div className="btn" onClick={() => setSearch("")}><X size={11} color={dark?"#666":"#aaa"}/></div>}
-          </div>
-          {aiResults && (
-            <div style={{ fontSize:11, color:GOLD, fontWeight:700, marginTop:8, display:"flex", alignItems:"center", gap:5 }}>
-              <Brain size={10} color={GOLD}/> Showing AI suggestions for "{goal}"
-              <span className="btn" onClick={() => setAiResults(null)}
-                style={{ color:dark?"#666":"#aaa", marginLeft:4, fontWeight:400 }}>clear</span>
-            </div>
-          )}
-          {aiError && <div style={{ fontSize:11, color:"#C47878", marginTop:8 }}>{aiError}</div>}
-        </div>
-
-        {/* Drill list */}
-        <div style={{ flex:1, overflowY:"auto", padding:"10px 20px 20px" }}>
-          {aiLoading && (
-            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", padding:"40px 0", gap:12 }}>
-              <div style={{ width:32, height:32, borderRadius:"50%", border:`3px solid ${GOLD}`, borderTopColor:"transparent", animation:"spin 0.8s linear infinite" }}/>
-              <div style={{ fontSize:13, color:dark?"#666":"#aaa" }}>Finding the best drills for your goal...</div>
-            </div>
-          )}
-          {!aiLoading && suggestedDrills.length === 0 && (
-            <div style={{ textAlign:"center", padding:"40px 0", color:dark?"#666":"#aaa", fontSize:13 }}>No drills found. Try a different search.</div>
-          )}
-          {!aiLoading && suggestedDrills.map((drill, i) => {
-            const alreadyAdded = block.drills.some(d => d.id === drill.id && d.section === drill.section);
-            const thumbColor = (SECTION_COLORS[drill.section] || SECTION_COLORS.pd)[drill.id % 8];
-            return (
-              <div key={`${drill.section}-${drill.id}`} style={{
-                display:"flex", gap:12, alignItems:"flex-start",
-                padding:"12px 13px", borderRadius:10, marginBottom:8,
-                background: alreadyAdded ? (dark?"rgba(226,221,159,0.08)":"rgba(226,221,159,0.18)") : (dark?"#2A2A2A":"#F8F8F8"),
-                border:`1px solid ${alreadyAdded ? GOLD+"60" : (dark?"#333":"#E8E8E8")}`,
-                transition:"all .15s",
-              }}>
-                {/* Thumb */}
-                <div style={{ width:48, height:48, borderRadius:8, background:thumbColor,
-                  display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                  <Play size={14} color="rgba(255,255,255,0.8)" fill="rgba(255,255,255,0.8)"/>
-                </div>
-                {/* Info */}
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13, fontWeight:700, color:dark?"#F2F2F2":"#111", marginBottom:2 }}>{drill.title}</div>
-                  <div style={{ fontSize:11, color:dark?"#666":"#aaa", marginBottom: drill.aiReason ? 5 : 0 }}>
-                    {drill.sectionLabel} · {drill.tag} · {drill.duration}
-                  </div>
-                  {drill.aiReason && (
-                    <div style={{ fontSize:11.5, color:GOLD, lineHeight:1.5, display:"flex", gap:5 }}>
-                      <Brain size={10} color={GOLD} style={{ flexShrink:0, marginTop:2 }}/>{drill.aiReason}
-                    </div>
-                  )}
-                </div>
-                {/* Add/remove */}
-                <div className="btn" onClick={() => alreadyAdded ? onRemoveDrill(drill) : onAddDrill(drill)}
-                  style={{ flexShrink:0, width:30, height:30, borderRadius:8,
-                    background: alreadyAdded ? GOLD : "transparent",
-                    border:`1px solid ${alreadyAdded ? GOLD : (dark?"#444":"#ddd")}`,
-                    display:"flex", alignItems:"center", justifyContent:"center", marginTop:2 }}>
-                  {alreadyAdded
-                    ? <CheckCircle size={14} color="#111"/>
-                    : <svg width="13" height="13" viewBox="0 0 8 8" fill="none"><path d="M4 1v6M1 4h6" stroke={dark?"#888":"#555"} strokeWidth="1.5" strokeLinecap="round"/></svg>
-                  }
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Footer */}
-        <div style={{ padding:"13px 20px", borderTop:`1px solid ${dark?"#333":"#eee"}`,
-          display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
-          <div style={{ fontSize:12, color:dark?"#666":"#aaa" }}>
-            {block.drills.length > 0
-              ? <span style={{ color:GOLD, fontWeight:700 }}>{block.drills.length} drill{block.drills.length>1?"s":""} added</span>
-              : "No drills added yet"}
-          </div>
-          <div className="btn" onClick={onClose}
-            style={{ fontSize:13, fontWeight:800, color:"#111", background:GOLD,
-              padding:"8px 20px", borderRadius:8, boxShadow:`0 4px 14px ${GOLD}44` }}>
-            Done
-          </div>
-        </div>
+          );
+        })}
       </div>
     </div>
   );
 }
 
 function PracticePlansPage({ C, dark }) {
-  const [tab, setTab] = useState("builder");
-  const [selectedPlan, setSelectedPlan] = useState(null);
   const [blocks, setBlocks] = useState([]);
-  const [planName, setPlanName] = useState("My Practice Plan");
+  const [planName, setPlanName] = useState("");
   const [editingName, setEditingName] = useState(false);
   const [dragIdx, setDragIdx] = useState(null);
-  const [dragOverIdx, setDragOverIdx] = useState(null);
+  const [dropIdx, setDropIdx] = useState(null);
   const [saved, setSaved] = useState(false);
-  const [activeFilter, setActiveFilter] = useState("All");
-  const [pickerBlock, setPickerBlock] = useState(null);
+  const [showBlockMenu, setShowBlockMenu] = useState(false);
+  const [blockSubMenu, setBlockSubMenu] = useState(null);
+  const [activeBlockId, setActiveBlockId] = useState(null);
+  const [savedPlans, setSavedPlans] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("bam_saved_plans") || "[]"); } catch { return []; }
+  });
+  const [customBlockName, setCustomBlockName] = useState("");
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  // Drill drag state
+  const [drillDrag, setDrillDrag] = useState(null); // { blockId, drillIdx }
+  const [drillDropTarget, setDrillDropTarget] = useState(null); // { blockId, drillIdx }
 
   const totalMins = blocks.reduce((s, b) => s + b.duration, 0);
-  const getBlockType = (id) => BLOCK_TYPES.find(b => b.id === id) || BLOCK_TYPES[0];
 
   const loadTemplate = (key) => {
     const tpl = PLAN_TEMPLATES[key];
-    setBlocks(tpl.map(b => ({ ...newBlock(b.type), duration: b.duration, goal: b.goal, drills: [] })));
-    setPlanName(key === "60min" ? "60-Min Skill Session" : key === "90min" ? "90-Min Team Practice" : "My Practice Plan");
+    setBlocks(tpl.map(b => newBlock(b.type, { duration: b.duration, notes: b.notes || "" })));
+    setPlanName(key === "60min" ? "60-Min Skill Session" : key === "90min" ? "90-Min Team Practice" : "");
+    setSaved(false);
+    setActiveBlockId(null);
+  };
+
+  const addBlock = (typeId, customName) => {
+    const b = newBlock(typeId, customName ? { customName } : {});
+    setBlocks(prev => [...prev, b]);
+    setActiveBlockId(b.id);
+    setShowBlockMenu(false);
+    setBlockSubMenu(null);
+    setShowCustomInput(false);
+    setCustomBlockName("");
     setSaved(false);
   };
 
-  const addBlock = (typeId) => { setBlocks(b => [...b, newBlock(typeId)]); setSaved(false); };
-  const removeBlock = (id) => { setBlocks(b => b.filter(x => x.id !== id)); setSaved(false); };
-  const updateBlock = (id, field, val) => { setBlocks(b => b.map(x => x.id === id ? { ...x, [field]: val } : x)); setSaved(false); };
+  const removeBlock = (id) => {
+    setBlocks(b => b.filter(x => x.id !== id));
+    if (activeBlockId === id) setActiveBlockId(null);
+    setSaved(false);
+  };
+
+  const updateBlock = (id, field, val) => {
+    setBlocks(b => b.map(x => x.id === id ? { ...x, [field]: val } : x));
+    setSaved(false);
+  };
 
   const addDrillToBlock = (blockId, drill) => {
     setBlocks(b => b.map(x => x.id === blockId
-      ? { ...x, drills: x.drills.some(d => d.id === drill.id && d.section === drill.section) ? x.drills : [...x.drills, drill] }
+      ? { ...x, drills: x.drills.some(d => d.id === drill.id && d.section === drill.section) ? x.drills : [...x.drills, { ...drill, drillNotes: "" }] }
       : x));
+    setSaved(false);
   };
   const removeDrillFromBlock = (blockId, drill) => {
     setBlocks(b => b.map(x => x.id === blockId
       ? { ...x, drills: x.drills.filter(d => !(d.id === drill.id && d.section === drill.section)) }
       : x));
+    setSaved(false);
+  };
+  const updateDrillNotes = (blockId, drillIdx, notes) => {
+    setBlocks(b => b.map(x => x.id === blockId
+      ? { ...x, drills: x.drills.map((d,i) => i === drillIdx ? { ...d, drillNotes: notes } : d) }
+      : x));
+    setSaved(false);
   };
 
-  const onDragStart = (e, idx) => { setDragIdx(idx); e.dataTransfer.effectAllowed = "move"; };
-  const onDragOver = (e, idx) => { e.preventDefault(); setDragOverIdx(idx); };
-  const onDrop = (e, idx) => {
+  // Block drag handlers
+  const onBlockDragStart = (e, idx) => {
+    setDragIdx(idx);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", "block");
+  };
+  const onBlockDragOver = (e, idx) => {
     e.preventDefault();
-    if (dragIdx === null || dragIdx === idx) { setDragIdx(null); setDragOverIdx(null); return; }
+    if (dragIdx === null) return;
+    setDropIdx(idx);
+  };
+  const onBlockDrop = (e, idx) => {
+    e.preventDefault();
+    if (dragIdx === null || dragIdx === idx) { setDragIdx(null); setDropIdx(null); return; }
     const arr = [...blocks];
     const [moved] = arr.splice(dragIdx, 1);
-    arr.splice(idx, 0, moved);
+    arr.splice(idx > dragIdx ? idx : idx, 0, moved);
     setBlocks(arr);
-    setDragIdx(null); setDragOverIdx(null); setSaved(false);
+    setDragIdx(null); setDropIdx(null); setSaved(false);
+  };
+  const onBlockDragEnd = () => { setDragIdx(null); setDropIdx(null); };
+
+  // Drill drag handlers (within and between blocks)
+  const onDrillDragStart = (e, blockId, drillIdx) => {
+    e.stopPropagation();
+    setDrillDrag({ blockId, drillIdx });
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", "drill");
+  };
+  const onDrillDragOver = (e, blockId, drillIdx) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!drillDrag) return;
+    setDrillDropTarget({ blockId, drillIdx });
+  };
+  const onDrillDrop = (e, targetBlockId, targetDrillIdx) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!drillDrag) return;
+    const { blockId: srcBlockId, drillIdx: srcDrillIdx } = drillDrag;
+
+    setBlocks(prev => {
+      const next = prev.map(b => ({ ...b, drills: [...b.drills] }));
+      const srcBlock = next.find(b => b.id === srcBlockId);
+      const tgtBlock = next.find(b => b.id === targetBlockId);
+      if (!srcBlock || !tgtBlock) return prev;
+
+      const [movedDrill] = srcBlock.drills.splice(srcDrillIdx, 1);
+      if (srcBlockId === targetBlockId && targetDrillIdx > srcDrillIdx) {
+        tgtBlock.drills.splice(targetDrillIdx - 1, 0, movedDrill);
+      } else {
+        tgtBlock.drills.splice(targetDrillIdx, 0, movedDrill);
+      }
+      return next;
+    });
+
+    setDrillDrag(null);
+    setDrillDropTarget(null);
+    setSaved(false);
+  };
+  const onDrillDragEnd = () => { setDrillDrag(null); setDrillDropTarget(null); };
+
+  // Save plan
+  const savePlan = () => {
+    if (blocks.length === 0) return;
+    const name = planName.trim() || "Untitled Plan";
+    const plan = {
+      id: Date.now(),
+      name,
+      blocks: blocks.map(b => ({
+        type: b.type, customName: b.customName, duration: b.duration, notes: b.notes,
+        drills: b.drills.map(d => ({ id:d.id, section:d.section, title:d.title, drillNotes:d.drillNotes||"" })),
+      })),
+      totalMins,
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [plan, ...savedPlans.filter(p => p.id !== plan.id)];
+    setSavedPlans(updated);
+    try { localStorage.setItem("bam_saved_plans", JSON.stringify(updated)); } catch {}
+    setPlanName(name);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
   };
 
-  const premadePlans = CONTENT.plans.items;
-  const filtered = activeFilter === "All" ? premadePlans : premadePlans.filter(i => i.tag === activeFilter);
+  // Load saved plan
+  const loadSavedPlan = (plan) => {
+    setPlanName(plan.name);
+    setBlocks(plan.blocks.map(b => {
+      const block = newBlock(b.type, { customName: b.customName || "", duration: b.duration, notes: b.notes || "" });
+      block.drills = b.drills.map(d => {
+        const full = ALL_DRILLS.find(ad => ad.id === d.id && ad.section === d.section);
+        return full ? { ...full, drillNotes: d.drillNotes || "" } : { id:d.id, section:d.section, title:d.title, drillNotes:d.drillNotes||"" };
+      });
+      return block;
+    }));
+    setActiveBlockId(null);
+    setSaved(true);
+  };
+
+  const deleteSavedPlan = (id) => {
+    const updated = savedPlans.filter(p => p.id !== id);
+    setSavedPlans(updated);
+    try { localStorage.setItem("bam_saved_plans", JSON.stringify(updated)); } catch {}
+  };
+
+  // Export PDF
+  const exportPDF = () => {
+    if (blocks.length === 0) return;
+    const name = planName.trim() || "Practice Plan";
+    let html = `<html><head><title>${name}</title><style>
+      body{font-family:'Helvetica Neue',Arial,sans-serif;max-width:700px;margin:40px auto;color:#222;padding:0 20px;}
+      h1{font-size:24px;border-bottom:2px solid #E2DD9F;padding-bottom:8px;margin-bottom:4px;}
+      .meta{font-size:13px;color:#666;margin-bottom:24px;}
+      .block{margin-bottom:20px;border:1px solid #ddd;border-radius:8px;overflow:hidden;}
+      .block-header{padding:12px 16px;background:#f8f6f0;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eee;}
+      .block-header .type{font-weight:700;font-size:14px;}
+      .block-header .dur{font-size:12px;color:#888;}
+      .block-notes{padding:8px 16px;font-size:12px;color:#555;font-style:italic;border-bottom:1px solid #f0f0f0;}
+      .drill{padding:8px 16px;font-size:13px;border-bottom:1px solid #f5f5f5;display:flex;gap:8px;align-items:flex-start;}
+      .drill:last-child{border-bottom:none;}
+      .drill-title{font-weight:600;}
+      .drill-notes{font-size:11px;color:#888;margin-top:2px;font-style:italic;}
+      @media print{body{margin:20px;}}
+    </style></head><body>`;
+    html += `<h1>${name}</h1>`;
+    html += `<div class="meta">${totalMins} minutes | ${blocks.length} blocks | ${blocks.reduce((s,b)=>s+b.drills.length,0)} drills</div>`;
+    let cumMins = 0;
+    blocks.forEach(b => {
+      const { category, sub } = findBlockMeta(b.type);
+      const blockLabel = b.customName || (sub ? sub.label : category.label);
+      html += `<div class="block">`;
+      html += `<div class="block-header"><span class="type">${blockLabel}</span><span class="dur">${cumMins}-${cumMins+b.duration} min (${b.duration} min)</span></div>`;
+      if (b.notes) html += `<div class="block-notes">${b.notes}</div>`;
+      b.drills.forEach(d => {
+        html += `<div class="drill"><div><div class="drill-title">${d.title}</div>`;
+        if (d.drillNotes) html += `<div class="drill-notes">${d.drillNotes}</div>`;
+        html += `</div></div>`;
+      });
+      if (b.drills.length === 0) html += `<div class="drill" style="color:#aaa">No drills added</div>`;
+      html += `</div>`;
+      cumMins += b.duration;
+    });
+    html += `</body></html>`;
+    const w = window.open("", "_blank");
+    w.document.write(html);
+    w.document.close();
+    setTimeout(() => w.print(), 400);
+  };
+
+  const activeBlock = blocks.find(b => b.id === activeBlockId);
 
   return (
     <div style={{ display:"flex", flex:1, overflow:"hidden", height:"100%" }}>
-      {pickerBlock && (
-        <DrillPicker
-          block={pickerBlock}
-          C={C} dark={dark}
-          onClose={() => setPickerBlock(null)}
-          onAddDrill={drill => { addDrillToBlock(pickerBlock.id, drill); setPickerBlock(b => ({...b, drills: [...b.drills.filter(d=>!(d.id===drill.id&&d.section===drill.section)), drill]})); }}
-          onRemoveDrill={drill => { removeDrillFromBlock(pickerBlock.id, drill); setPickerBlock(b => ({...b, drills: b.drills.filter(d=>!(d.id===drill.id&&d.section===drill.section))})); }}
-        />
-      )}
-
-      <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-        {/* Header + tabs */}
-        <div style={{ padding:"24px 28px 0", flexShrink:0 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
-            <FileText size={20} color={GOLD} strokeWidth={2}/>
-            <div style={{ fontSize:22, fontWeight:800, color:C.text, textTransform:"uppercase", letterSpacing:.5 }}>Practice Plans</div>
+      {/* Left sidebar — Saved Plans */}
+      <div style={{ width:200, borderRight:`1px solid ${C.border}`, display:"flex", flexDirection:"column", overflow:"hidden", flexShrink:0 }}>
+        <div style={{ padding:"18px 14px 10px", borderBottom:`1px solid ${C.border}`, flexShrink:0 }}>
+          <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:18, color:GOLD, letterSpacing:1.5, marginBottom:2 }}>SAVED PLANS</div>
+          <div style={{ fontSize:11, color:C.textDim }}>{savedPlans.length} plan{savedPlans.length!==1?"s":""}</div>
+        </div>
+        <div style={{ flex:1, overflowY:"auto", padding:"8px 10px" }}>
+          {/* New plan button */}
+          <div className="btn" onClick={() => { setBlocks([]); setPlanName(""); setActiveBlockId(null); setSaved(false); }}
+            style={{ display:"flex", alignItems:"center", gap:7, padding:"9px 10px", borderRadius:8,
+              background:GOLD+"18", border:`1px dashed ${GOLD}50`, marginBottom:10,
+              fontSize:12, fontWeight:700, color:GOLD, cursor:"pointer" }}>
+            <Plus size={13} color={GOLD}/> New Plan
           </div>
-          <div style={{ fontSize:14, color:C.textDim, marginBottom:20 }}>Ready-to-run plans and your own custom builder.</div>
-          <div style={{ display:"flex", gap:4, borderBottom:`1px solid ${C.border}` }}>
-            {[["premade","📋 Pre-Made Plans"],["builder","🔧 Plan Builder"]].map(([id,label]) => (
-              <div key={id} onClick={() => setTab(id)} className="btn"
-                style={{ padding:"10px 20px", fontSize:13, fontWeight:700,
-                  color:tab===id?GOLD:C.textDim,
-                  borderBottom:tab===id?`2px solid ${GOLD}`:"2px solid transparent",
-                  marginBottom:-1, cursor:"pointer", letterSpacing:.3 }}>
-                {label}
-              </div>
-            ))}
+          {/* Templates */}
+          <div style={{ fontSize:10, fontWeight:800, color:C.textDim, letterSpacing:1, textTransform:"uppercase", marginBottom:6, marginTop:4 }}>Templates</div>
+          {[["60min","60-Min Session"],["90min","90-Min Team"]].map(([k,l]) => (
+            <div key={k} className="btn" onClick={() => loadTemplate(k)}
+              style={{ fontSize:11, fontWeight:600, color:C.textMid, padding:"7px 10px",
+                borderRadius:7, border:`1px solid ${C.border}`, marginBottom:5,
+                background:C.bgHover }}>
+              {l}
+            </div>
+          ))}
+          {savedPlans.length > 0 && (
+            <>
+              <div style={{ fontSize:10, fontWeight:800, color:C.textDim, letterSpacing:1, textTransform:"uppercase", marginBottom:6, marginTop:14 }}>Your Plans</div>
+              {savedPlans.map(p => (
+                <div key={p.id} style={{ padding:"8px 10px", borderRadius:7, border:`1px solid ${C.border}`,
+                  marginBottom:5, background:C.bgHover, cursor:"pointer", position:"relative" }}>
+                  <div className="btn" onClick={() => loadSavedPlan(p)}>
+                    <div style={{ fontSize:12, fontWeight:700, color:C.text, marginBottom:2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.name}</div>
+                    <div style={{ fontSize:10, color:C.textDim }}>{p.totalMins} min · {p.blocks.length} blocks</div>
+                  </div>
+                  <div className="btn" onClick={() => deleteSavedPlan(p.id)}
+                    style={{ position:"absolute", top:8, right:8 }}>
+                    <Trash2 size={10} color={C.textDim}/>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Center — Plan Builder */}
+      <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minWidth:0 }}>
+        {/* Top bar */}
+        <div style={{ padding:"14px 20px", borderBottom:`1px solid ${C.border}`,
+          display:"flex", alignItems:"center", gap:12, flexShrink:0 }}>
+          <FileText size={18} color={GOLD} strokeWidth={2}/>
+          {editingName ? (
+            <input value={planName} onChange={e => setPlanName(e.target.value)}
+              onBlur={() => setEditingName(false)} onKeyDown={e => e.key==="Enter"&&setEditingName(false)}
+              autoFocus placeholder="Plan name..."
+              style={{ fontSize:16, fontWeight:800, color:C.text, background:"transparent",
+                border:`1px solid ${GOLD}`, borderRadius:6, padding:"4px 10px",
+                outline:"none", fontFamily:"'DM Sans',sans-serif", minWidth:180 }}/>
+          ) : (
+            <div className="btn" onClick={() => setEditingName(true)}
+              style={{ fontSize:16, fontWeight:800, color:C.text }}>
+              {planName || "Untitled Plan"}
+            </div>
+          )}
+          <div style={{ display:"flex", alignItems:"center", gap:5, fontSize:12, color:C.textDim, marginLeft:8 }}>
+            <Clock size={12} color={C.textDim}/>{totalMins} min
+          </div>
+          <div style={{ fontSize:12, color:C.textDim }}>{blocks.length} blocks</div>
+          <div style={{ fontSize:12, color:C.textDim }}>
+            {blocks.reduce((s,b)=>s+b.drills.length,0)} drills
+          </div>
+          <div style={{ flex:1 }}/>
+          <div className="btn" onClick={exportPDF}
+            style={{ fontSize:12, fontWeight:700, color:C.textMid, padding:"7px 14px", borderRadius:7,
+              border:`1px solid ${C.border}`, display:"flex", alignItems:"center", gap:6,
+              opacity:blocks.length===0?0.4:1 }}>
+            <Download size={12} color={C.textDim}/> Export PDF
+          </div>
+          <div className="btn" onClick={savePlan}
+            style={{ fontSize:13, fontWeight:800, color:"#111", background:GOLD,
+              padding:"8px 18px", borderRadius:8, boxShadow:`0 4px 14px ${GOLD}44`,
+              display:"flex", alignItems:"center", gap:6,
+              opacity:blocks.length===0?0.4:1 }}>
+            <Save size={14} color="#111"/>
+            {saved ? "Saved" : "Save Plan"}
           </div>
         </div>
 
-        {/* Pre-made tab */}
-        {tab === "premade" && (
-          <div style={{ flex:1, overflow:"auto", padding:"20px 28px 28px" }}>
-            <div style={{ display:"flex", gap:8, marginBottom:22, flexWrap:"wrap" }}>
-              {CONTENT.plans.filters.map(f => (
-                <div key={f} className="tag-pill" onClick={() => setActiveFilter(f)}
-                  style={{ fontSize:12, fontWeight:700, padding:"6px 16px", borderRadius:20,
-                    border:`1px solid ${activeFilter===f?GOLD:C.border}`,
-                    background:activeFilter===f?GOLD:"transparent",
-                    color:activeFilter===f?"#111":C.textMid }}>
-                  {f}
-                </div>
-              ))}
+        {/* Plan canvas */}
+        <div style={{ flex:1, overflowY:"auto", padding:"20px 24px 40px" }}>
+          {/* Progress bar */}
+          {blocks.length > 0 && (
+            <div style={{ display:"flex", gap:3, marginBottom:18, height:6, borderRadius:6, overflow:"hidden" }}>
+              {blocks.map(b => {
+                const { category } = findBlockMeta(b.type);
+                const pct = totalMins > 0 ? (b.duration/totalMins)*100 : 0;
+                return <div key={b.id} title={`${category.label} - ${b.duration}min`}
+                  style={{ flex:`0 0 ${pct}%`, background:category.color, borderRadius:2, transition:"flex .3s" }}/>;
+              })}
             </div>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))", gap:16 }}>
-              {filtered.map(item => (
-                <ContentCard key={item.id} item={item} sectionId="plans" C={C} dark={dark} onClick={setSelectedPlan}/>
-              ))}
-            </div>
-          </div>
-        )}
+          )}
 
-        {/* Builder tab */}
-        {tab === "builder" && (
-          <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
-            {/* Palette */}
-            <div style={{ width:186, borderRight:`1px solid ${C.border}`, padding:"16px 14px", overflowY:"auto", flexShrink:0 }}>
-              <div style={{ fontSize:11, fontWeight:800, color:C.textDim, letterSpacing:1.2, textTransform:"uppercase", marginBottom:12 }}>Add Block</div>
-              {BLOCK_TYPES.map(bt => (
-                <div key={bt.id} className="btn" onClick={() => addBlock(bt.id)}
-                  style={{ display:"flex", alignItems:"center", gap:9, padding:"8px 10px", borderRadius:8,
-                    background:C.bgHover, border:`1px solid ${C.border}`, marginBottom:6 }}>
-                  <div style={{ width:28, height:28, borderRadius:7, background:bt.color+"33",
-                    border:`1px solid ${bt.color}55`, display:"flex", alignItems:"center",
-                    justifyContent:"center", fontSize:13, flexShrink:0 }}>{bt.emoji}</div>
-                  <span style={{ fontSize:12, fontWeight:600, color:C.textMid }}>{bt.label}</span>
+          {/* Empty state */}
+          {blocks.length === 0 && !showBlockMenu && (
+            <div style={{ display:"flex", flexDirection:"column", alignItems:"center",
+              justifyContent:"center", height:"60%", gap:14, color:C.textDim }}>
+              <FileText size={40} color={C.textDim} strokeWidth={1.2} style={{ opacity:.4 }}/>
+              <div style={{ fontSize:16, fontWeight:700 }}>Your plan is empty</div>
+              <div style={{ fontSize:13 }}>Add blocks to build your practice plan</div>
+              <div style={{ display:"flex", gap:8, marginTop:4 }}>
+                <div className="btn" onClick={() => setShowBlockMenu(true)}
+                  style={{ fontSize:13, fontWeight:700, padding:"9px 18px", borderRadius:8,
+                    background:GOLD, color:"#111" }}>
+                  Add a Block
                 </div>
-              ))}
-              <div style={{ marginTop:16, paddingTop:14, borderTop:`1px solid ${C.border}` }}>
-                <div style={{ fontSize:11, fontWeight:800, color:C.textDim, letterSpacing:1.2, textTransform:"uppercase", marginBottom:10 }}>Templates</div>
-                {[["60min","60-Min Session"],["90min","90-Min Team"],["blank","Blank"]].map(([k,l]) => (
-                  <div key={k} className="btn" onClick={() => loadTemplate(k)}
-                    style={{ fontSize:12, fontWeight:600, color:C.textMid, padding:"7px 10px",
-                      borderRadius:7, border:`1px solid ${C.border}`, marginBottom:6,
-                      background:C.bgHover, textAlign:"center" }}>
-                    {l}
+                <div className="btn" onClick={() => loadTemplate("60min")}
+                  style={{ fontSize:13, fontWeight:700, padding:"9px 18px", borderRadius:8,
+                    color:C.textMid, border:`1px solid ${C.border}` }}>
+                  Load 60-Min
+                </div>
+                <div className="btn" onClick={() => loadTemplate("90min")}
+                  style={{ fontSize:13, fontWeight:700, padding:"9px 18px", borderRadius:8,
+                    color:C.textMid, border:`1px solid ${C.border}` }}>
+                  Load 90-Min
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Blocks */}
+          {blocks.map((b, idx) => {
+            const { category, sub } = findBlockMeta(b.type);
+            const color = category.color;
+            const blockLabel = b.customName || (sub ? sub.label : category.label);
+            const isDragging = dragIdx === idx;
+            const isDropBefore = dropIdx === idx && dragIdx !== null && dragIdx !== idx;
+            const isActive = activeBlockId === b.id;
+            const isPDP = sub?.isPDP;
+            let cumMins = 0;
+            for (let i = 0; i < idx; i++) cumMins += blocks[i].duration;
+
+            return (
+              <div key={b.id}>
+                {/* Drop zone indicator */}
+                <div className="pp-drop-zone"
+                  onDragOver={e => onBlockDragOver(e, idx)}
+                  onDrop={e => onBlockDrop(e, idx)}
+                  style={{ height: isDropBefore ? 40 : 0, opacity: isDropBefore ? 1 : 0,
+                    display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  {isDropBefore && <div style={{ width:"90%", height:3, borderRadius:2, background:GOLD }}/>}
+                </div>
+
+                <div className={`pp-block${isDragging?" dragging":""}`} draggable
+                  onDragStart={e => onBlockDragStart(e, idx)}
+                  onDragEnd={onBlockDragEnd}
+                  onClick={() => setActiveBlockId(isActive ? null : b.id)}
+                  style={{ marginBottom:8, borderRadius:11, background:C.bgCard,
+                    border:`1px solid ${isActive ? GOLD+"70" : C.border}`,
+                    borderLeft:`4px solid ${color}`,
+                    boxShadow: isActive ? `0 2px 12px ${GOLD}15` : "none",
+                    cursor:"pointer" }}>
+
+                  {/* Block header row */}
+                  <div style={{ display:"flex", gap:10, alignItems:"center", padding:"12px 14px 10px" }}>
+                    <div style={{ cursor:"grab", color:C.textDim, display:"flex", alignItems:"center" }}
+                      onMouseDown={e => e.stopPropagation()}>
+                      <GripVertical size={16} color={C.textDim}/>
+                    </div>
+                    <div style={{ width:30, height:30, borderRadius:7, background:color+"25",
+                      border:`1px solid ${color}50`, display:"flex", alignItems:"center",
+                      justifyContent:"center", flexShrink:0 }}>
+                      {(BLOCK_ICON_MAP[category.icon] || BLOCK_ICON_MAP.custom)(color, 14)}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                        {category.isCustom ? (
+                          <input value={b.customName} onChange={e => { e.stopPropagation(); updateBlock(b.id,"customName",e.target.value); }}
+                            onClick={e => e.stopPropagation()} placeholder="Block name..."
+                            style={{ fontSize:13, fontWeight:800, color:C.text, background:"transparent",
+                              border:"none", outline:"none", fontFamily:"'DM Sans',sans-serif", flex:1, minWidth:0 }}/>
+                        ) : (
+                          <div style={{ fontSize:13, fontWeight:800, color:C.text }}>{blockLabel}</div>
+                        )}
+                        {sub && <div style={{ fontSize:10, color:color, fontWeight:600, background:color+"18", padding:"2px 8px", borderRadius:8 }}>{category.label}</div>}
+                      </div>
+                      <div style={{ fontSize:10, color:C.textDim, marginTop:2 }}>
+                        {cumMins}-{cumMins+b.duration} min
+                      </div>
+                    </div>
+                    {/* Duration selector */}
+                    <div style={{ display:"flex", alignItems:"center", gap:4, flexShrink:0 }} onClick={e => e.stopPropagation()}>
+                      {DURATION_PRESETS.map(d => (
+                        <div key={d} className="btn" onClick={() => updateBlock(b.id,"duration",d)}
+                          style={{ width:28, height:24, borderRadius:5, fontSize:10, fontWeight:700,
+                            display:"flex", alignItems:"center", justifyContent:"center",
+                            background: b.duration===d ? GOLD : C.bgHover,
+                            color: b.duration===d ? "#111" : C.textDim,
+                            border:`1px solid ${b.duration===d ? GOLD : C.border}` }}>
+                          {d}
+                        </div>
+                      ))}
+                      <input type="number" min={1} max={120} value={b.duration}
+                        onChange={e => updateBlock(b.id,"duration",Math.max(1,parseInt(e.target.value)||1))}
+                        style={{ width:36, background:C.bgHover, border:`1px solid ${C.border}`, borderRadius:5,
+                          outline:"none", fontSize:11, fontWeight:700, color:C.text,
+                          fontFamily:"'DM Sans',sans-serif", textAlign:"center", padding:"3px 2px" }}/>
+                      <span style={{ fontSize:10, color:C.textDim }}>min</span>
+                    </div>
+                    <div className="btn" onClick={e => { e.stopPropagation(); removeBlock(b.id); }}
+                      style={{ flexShrink:0, marginLeft:4 }}>
+                      <Trash2 size={13} color={C.textDim}/>
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            {/* Canvas */}
-            <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-              {/* Stats bar */}
-              <div style={{ padding:"13px 20px", borderBottom:`1px solid ${C.border}`,
-                display:"flex", alignItems:"center", gap:14, flexShrink:0 }}>
-                {editingName ? (
-                  <input value={planName} onChange={e => setPlanName(e.target.value)}
-                    onBlur={() => setEditingName(false)} onKeyDown={e => e.key==="Enter"&&setEditingName(false)}
-                    autoFocus
-                    style={{ fontSize:16, fontWeight:800, color:C.text, background:"transparent",
-                      border:`1px solid ${GOLD}`, borderRadius:6, padding:"4px 10px",
-                      outline:"none", fontFamily:"'DM Sans',sans-serif", minWidth:200 }}/>
-                ) : (
-                  <div className="btn" onClick={() => setEditingName(true)}
-                    style={{ fontSize:16, fontWeight:800, color:C.text }}>{planName}</div>
-                )}
-                <div style={{ display:"flex", alignItems:"center", gap:5, fontSize:12, color:C.textDim }}>
-                  <Clock size={12} color={C.textDim}/>{totalMins} min
-                </div>
-                <div style={{ fontSize:12, color:C.textDim }}>·</div>
-                <div style={{ fontSize:12, color:C.textDim }}>{blocks.length} blocks</div>
-                <div style={{ fontSize:12, color:C.textDim }}>·</div>
-                <div style={{ fontSize:12, color:C.textDim }}>
-                  {blocks.reduce((s,b)=>s+b.drills.length,0)} drills
-                </div>
-                <div style={{ flex:1 }}/>
-                <div className="btn" onClick={() => { setSaved(true); setTimeout(()=>setSaved(false),2500); }}
-                  style={{ fontSize:13, fontWeight:800, color:"#111", background:GOLD,
-                    padding:"8px 20px", borderRadius:8, boxShadow:`0 4px 14px ${GOLD}44`,
-                    display:"flex", alignItems:"center", gap:7,
-                    opacity:blocks.length===0?0.5:1 }}>
-                  <Ic.Heart c={"#111"} s={14} f/>
-                  {saved ? "Saved ✓" : "Save Plan"}
-                </div>
-              </div>
+                  {/* Block notes */}
+                  <div style={{ padding:"0 14px 0 58px" }} onClick={e => e.stopPropagation()}>
+                    <input value={b.notes} onChange={e => updateBlock(b.id,"notes",e.target.value)}
+                      placeholder="Block notes..."
+                      style={{ width:"100%", background:"transparent", border:"none", outline:"none",
+                        fontSize:12, color:C.textDim, fontFamily:"'DM Sans',sans-serif",
+                        fontStyle:"italic", caretColor:GOLD }}/>
+                  </div>
 
-              {/* Timeline */}
-              <div style={{ flex:1, overflowY:"auto", padding:20 }}>
-                {blocks.length === 0 && (
-                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center",
-                    justifyContent:"center", height:"70%", gap:14, color:C.textDim }}>
-                    <FileText size={40} color={C.textDim} strokeWidth={1.2} style={{ opacity:.4 }}/>
-                    <div style={{ fontSize:16, fontWeight:700 }}>Your plan is empty</div>
-                    <div style={{ fontSize:13 }}>Add blocks from the left, or load a template</div>
-                    <div style={{ display:"flex", gap:8, marginTop:4 }}>
-                      {[["60min","Load 60-Min"],["90min","Load 90-Min"]].map(([k,l],i) => (
-                        <div key={k} className="btn" onClick={() => loadTemplate(k)}
-                          style={{ fontSize:13, fontWeight:700, padding:"9px 18px", borderRadius:8,
-                            background:i===0?GOLD:"transparent", color:i===0?"#111":C.textMid,
-                            border:`1px solid ${i===0?GOLD:C.border}` }}>
-                          {l}
+                  {/* PDP structure */}
+                  {isPDP && (
+                    <div style={{ padding:"8px 14px 6px 58px", display:"flex", gap:6, alignItems:"center" }}>
+                      {["Game","Drill","Game"].map((slot,i) => (
+                        <div key={i} style={{ flex:1, padding:"6px 10px", borderRadius:6,
+                          background: i===1 ? (dark?"rgba(107,158,122,0.15)":"rgba(107,158,122,0.1)") : (dark?"rgba(158,107,122,0.15)":"rgba(158,107,122,0.1)"),
+                          border:`1px solid ${i===1 ? "#6B9E7A40" : "#9E6B7A40"}`,
+                          textAlign:"center", fontSize:11, fontWeight:700,
+                          color: i===1 ? "#6B9E7A" : "#9E6B7A" }}>
+                          {slot} {i===0?"1":i===2?"2":""}
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Progress bar */}
-                {blocks.length > 0 && (
-                  <div style={{ display:"flex", gap:3, marginBottom:18, height:6, borderRadius:6, overflow:"hidden" }}>
-                    {blocks.map(b => {
-                      const bt = getBlockType(b.type);
-                      const pct = totalMins > 0 ? (b.duration/totalMins)*100 : 0;
-                      return <div key={b.id} title={`${bt.label} — ${b.duration}min`}
-                        style={{ flex:`0 0 ${pct}%`, background:bt.color, borderRadius:2, transition:"flex .3s" }}/>;
-                    })}
-                  </div>
-                )}
-
-                {/* Blocks */}
-                {blocks.map((b, idx) => {
-                  const bt = getBlockType(b.type);
-                  const isDragging = dragIdx === idx;
-                  const isOver = dragOverIdx === idx && dragIdx !== idx;
-                  return (
-                    <div key={b.id} draggable
-                      onDragStart={e=>onDragStart(e,idx)} onDragOver={e=>onDragOver(e,idx)}
-                      onDrop={e=>onDrop(e,idx)} onDragEnd={()=>{setDragIdx(null);setDragOverIdx(null);}}
-                      style={{ marginBottom:10, borderRadius:11, background:C.bgCard,
-                        border:`1px solid ${isOver?GOLD:C.border}`, borderLeft:`3px solid ${bt.color}`,
-                        opacity:isDragging?0.4:1,
-                        transform:isOver?"translateY(-2px)":"none",
-                        transition:"border-color .15s,transform .15s,opacity .15s",
-                        boxShadow:isOver?`0 4px 18px ${C.shadow}`:"none" }}>
-
-                      {/* Block top row */}
-                      <div style={{ display:"flex", gap:11, alignItems:"center", padding:"12px 14px 10px" }}>
-                        <div style={{ fontSize:18, cursor:"grab" }}>{bt.emoji}</div>
-                        <div style={{ flex:1 }}>
-                          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                            <div style={{ fontSize:13, fontWeight:800, color:C.text }}>{bt.label}</div>
-                            <div style={{ display:"flex", alignItems:"center", gap:5,
-                              background:C.bgHover, borderRadius:7, padding:"3px 9px",
-                              border:`1px solid ${C.border}` }}>
-                              <Clock size={10} color={C.textDim}/>
-                              <input type="number" min={1} max={120} value={b.duration}
-                                onChange={e=>updateBlock(b.id,"duration",Math.max(1,parseInt(e.target.value)||1))}
-                                onClick={e=>e.stopPropagation()}
-                                style={{ width:30, background:"transparent", border:"none", outline:"none",
-                                  fontSize:12, fontWeight:700, color:C.text,
-                                  fontFamily:"'DM Sans',sans-serif", textAlign:"center" }}/>
-                              <span style={{ fontSize:11, color:C.textDim }}>min</span>
-                            </div>
-                            <div style={{ fontSize:10, color:C.textDim, marginLeft:"auto" }}>#{idx+1}</div>
-                            <div className="btn" onClick={()=>removeBlock(b.id)}>
-                              <X size={12} color={C.textDim}/>
+                  {/* Drills list */}
+                  {b.drills.length > 0 && (
+                    <div style={{ padding:"8px 14px 6px 50px" }}>
+                      {b.drills.map((d, di) => {
+                        const thumbColor = (SECTION_COLORS[d.section]||SECTION_COLORS.pd)[(d.id||0)%8];
+                        const isDrillDragging = drillDrag?.blockId===b.id && drillDrag?.drillIdx===di;
+                        const isDrillDropBefore = drillDropTarget?.blockId===b.id && drillDropTarget?.drillIdx===di && drillDrag && !(drillDrag.blockId===b.id && drillDrag.drillIdx===di);
+                        return (
+                          <div key={`${d.section}-${d.id}-${di}`}>
+                            {isDrillDropBefore && <div style={{ height:3, background:GOLD, borderRadius:2, margin:"4px 0" }}/>}
+                            <div className={`pp-drill-item${isDrillDragging?" dragging":""}`}
+                              draggable
+                              onDragStart={e => onDrillDragStart(e, b.id, di)}
+                              onDragOver={e => onDrillDragOver(e, b.id, di)}
+                              onDrop={e => onDrillDrop(e, b.id, di)}
+                              onDragEnd={onDrillDragEnd}
+                              onClick={e => e.stopPropagation()}
+                              style={{ display:"flex", gap:8, alignItems:"center", padding:"6px 8px",
+                                borderRadius:7, background:C.bgHover, border:`1px solid ${C.border}`,
+                                marginBottom:5 }}>
+                              <GripVertical size={12} color={C.textDim} style={{ cursor:"grab", flexShrink:0 }}/>
+                              <div style={{ width:28, height:28, borderRadius:5, background:thumbColor, flexShrink:0,
+                                display:"flex", alignItems:"center", justifyContent:"center" }}>
+                                <Play size={9} color="rgba(255,255,255,0.8)" fill="rgba(255,255,255,0.8)"/>
+                              </div>
+                              <div style={{ flex:1, minWidth:0 }}>
+                                <div style={{ fontSize:12, fontWeight:700, color:C.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{d.title}</div>
+                                <input value={d.drillNotes || ""} onChange={e => updateDrillNotes(b.id, di, e.target.value)}
+                                  placeholder="Drill notes..."
+                                  style={{ width:"100%", background:"transparent", border:"none", outline:"none",
+                                    fontSize:10, color:C.textDim, fontFamily:"'DM Sans',sans-serif", fontStyle:"italic", marginTop:1 }}/>
+                              </div>
+                              <div className="btn" onClick={() => removeDrillFromBlock(b.id, d)} style={{ flexShrink:0 }}>
+                                <X size={11} color={C.textDim}/>
+                              </div>
                             </div>
                           </div>
-                          {/* Goal line */}
-                          <input value={b.goal} onChange={e=>updateBlock(b.id,"goal",e.target.value)}
-                            placeholder="What's the goal of this block?"
-                            style={{ marginTop:7, width:"100%", background:"transparent", border:"none",
-                              outline:"none", fontSize:12.5, color:C.textDim,
-                              fontFamily:"'DM Sans',sans-serif", caretColor:GOLD }}/>
-                        </div>
-                      </div>
-
-                      {/* Drills attached */}
-                      {b.drills.length > 0 && (
-                        <div style={{ padding:"0 14px 10px", display:"flex", flexWrap:"wrap", gap:6 }}>
-                          {b.drills.map(d => {
-                            const thumbColor = (SECTION_COLORS[d.section]||SECTION_COLORS.pd)[d.id%8];
-                            return (
-                              <div key={`${d.section}-${d.id}`}
-                                style={{ display:"flex", alignItems:"center", gap:7, padding:"5px 10px",
-                                  borderRadius:8, background:C.bgHover, border:`1px solid ${C.border}`,
-                                  fontSize:12, color:C.textMid, maxWidth:220 }}>
-                                <div style={{ width:18, height:18, borderRadius:4, background:thumbColor, flexShrink:0 }}/>
-                                <span style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", fontWeight:600 }}>{d.title}</span>
-                                <div className="btn" onClick={()=>removeDrillFromBlock(b.id,d)} style={{ flexShrink:0, marginLeft:2 }}>
-                                  <X size={10} color={C.textDim}/>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {/* Add drills CTA */}
-                      <div style={{ padding:"0 14px 12px" }}>
-                        <div className="btn" onClick={() => setPickerBlock(blocks.find(x=>x.id===b.id))}
-                          style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"6px 12px",
-                            borderRadius:7, border:`1px dashed ${b.drills.length>0?GOLD+"60":C.border}`,
-                            fontSize:12, color:b.drills.length>0?GOLD:C.textDim, fontWeight:600 }}>
-                          <svg width="10" height="10" viewBox="0 0 8 8" fill="none">
-                            <path d="M4 1v6M1 4h6" stroke={b.drills.length>0?GOLD:C.textDim} strokeWidth="1.5" strokeLinecap="round"/>
-                          </svg>
-                          {b.drills.length > 0 ? `${b.drills.length} drill${b.drills.length>1?"s":""} — add more` : "Add drills"}
-                        </div>
+                        );
+                      })}
+                      {/* Drop zone at end of drill list */}
+                      <div onDragOver={e => onDrillDragOver(e, b.id, b.drills.length)}
+                        onDrop={e => onDrillDrop(e, b.id, b.drills.length)}
+                        style={{ height:drillDropTarget?.blockId===b.id && drillDropTarget?.drillIdx===b.drills.length ? 20 : 4 }}>
+                        {drillDropTarget?.blockId===b.id && drillDropTarget?.drillIdx===b.drills.length && (
+                          <div style={{ height:3, background:GOLD, borderRadius:2, margin:"4px 0" }}/>
+                        )}
                       </div>
                     </div>
-                  );
-                })}
+                  )}
+
+                  {/* Add drills CTA */}
+                  <div style={{ padding:"4px 14px 12px 58px" }}>
+                    <div className="btn" onClick={e => { e.stopPropagation(); setActiveBlockId(b.id); }}
+                      style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"5px 12px",
+                        borderRadius:7, border:`1px dashed ${b.drills.length>0?GOLD+"50":C.border}`,
+                        fontSize:11, color:b.drills.length>0?GOLD:C.textDim, fontWeight:600 }}>
+                      <Plus size={11} color={b.drills.length>0?GOLD:C.textDim}/>
+                      {b.drills.length > 0 ? `${b.drills.length} drill${b.drills.length>1?"s":""} - add more` : "Add drills"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Drop zone at end for dragging blocks to bottom */}
+          {dragIdx !== null && (
+            <div className="pp-drop-zone"
+              onDragOver={e => onBlockDragOver(e, blocks.length)}
+              onDrop={e => onBlockDrop(e, blocks.length)}
+              style={{ height: dropIdx === blocks.length ? 40 : 20, opacity: dropIdx === blocks.length ? 1 : 0.3,
+                display:"flex", alignItems:"center", justifyContent:"center" }}>
+              {dropIdx === blocks.length && <div style={{ width:"90%", height:3, borderRadius:2, background:GOLD }}/>}
+            </div>
+          )}
+
+          {/* Add block button */}
+          {blocks.length > 0 && (
+            <div style={{ marginTop:8, position:"relative" }}>
+              <div className="btn" onClick={() => { setShowBlockMenu(!showBlockMenu); setBlockSubMenu(null); setShowCustomInput(false); }}
+                style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7,
+                  padding:"12px 0", borderRadius:10, border:`1px dashed ${GOLD}50`,
+                  background: dark ? "rgba(226,221,159,0.04)" : "rgba(226,221,159,0.08)",
+                  fontSize:13, fontWeight:700, color:GOLD, cursor:"pointer" }}>
+                <Plus size={15} color={GOLD}/> Add a Block
               </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {/* Block type selector menu */}
+          {showBlockMenu && (
+            <div style={{ marginTop:8, background:C.bgCard, border:`1px solid ${C.border}`, borderRadius:12,
+              padding:10, boxShadow:`0 8px 30px ${C.shadow}`, animation:"popIn .15s ease both" }}>
+              <div style={{ fontSize:10, fontWeight:800, color:C.textDim, letterSpacing:1, textTransform:"uppercase", marginBottom:8, padding:"0 6px" }}>
+                SELECT BLOCK TYPE
+              </div>
+              {BLOCK_CATEGORIES.map(cat => (
+                <div key={cat.id}>
+                  <div className="btn"
+                    onClick={() => {
+                      if (cat.subs.length > 0) {
+                        setBlockSubMenu(blockSubMenu === cat.id ? null : cat.id);
+                        setShowCustomInput(false);
+                      } else if (cat.isCustom) {
+                        setShowCustomInput(!showCustomInput);
+                        setBlockSubMenu(null);
+                      } else {
+                        addBlock(cat.id);
+                      }
+                    }}
+                    style={{ display:"flex", alignItems:"center", gap:9, padding:"8px 10px", borderRadius:8,
+                      background: blockSubMenu===cat.id ? (dark?"rgba(255,255,255,0.04)":"rgba(0,0,0,0.03)") : "transparent",
+                      marginBottom:2 }}>
+                    <div style={{ width:28, height:28, borderRadius:7, background:cat.color+"25",
+                      border:`1px solid ${cat.color}50`, display:"flex", alignItems:"center",
+                      justifyContent:"center", flexShrink:0 }}>
+                      {(BLOCK_ICON_MAP[cat.icon] || BLOCK_ICON_MAP.custom)(cat.color, 14)}
+                    </div>
+                    <span style={{ fontSize:12, fontWeight:700, color:C.text, flex:1 }}>{cat.label}</span>
+                    {cat.subs.length > 0 && <ChevronRight size={13} color={C.textDim}/>}
+                  </div>
+                  {/* Sub-types */}
+                  {blockSubMenu === cat.id && cat.subs.length > 0 && (
+                    <div style={{ marginLeft:36, marginBottom:4 }}>
+                      {cat.subs.map(s => (
+                        <div key={s.id} className="btn" onClick={() => addBlock(s.id)}
+                          style={{ fontSize:12, fontWeight:600, color:C.textMid, padding:"6px 10px",
+                            borderRadius:6, marginBottom:2, cursor:"pointer",
+                            borderLeft:`2px solid ${cat.color}40` }}>
+                          {s.label}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* Custom block name input */}
+                  {cat.isCustom && showCustomInput && (
+                    <div style={{ marginLeft:36, marginBottom:4, display:"flex", gap:6 }}>
+                      <input value={customBlockName} onChange={e => setCustomBlockName(e.target.value)}
+                        onKeyDown={e => { if (e.key==="Enter" && customBlockName.trim()) addBlock("custom", customBlockName.trim()); }}
+                        placeholder="Block name..." autoFocus
+                        style={{ flex:1, fontSize:12, padding:"6px 10px", borderRadius:6,
+                          background:C.bgHover, border:`1px solid ${C.border}`, outline:"none",
+                          color:C.text, fontFamily:"'DM Sans',sans-serif" }}/>
+                      <div className="btn" onClick={() => { if (customBlockName.trim()) addBlock("custom", customBlockName.trim()); }}
+                        style={{ fontSize:12, fontWeight:700, padding:"6px 12px", borderRadius:6,
+                          background:GOLD, color:"#111" }}>Add</div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              <div className="btn" onClick={() => { setShowBlockMenu(false); setBlockSubMenu(null); setShowCustomInput(false); }}
+                style={{ display:"flex", alignItems:"center", justifyContent:"center", padding:"6px",
+                  fontSize:11, color:C.textDim, marginTop:4 }}>
+                Cancel
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {tab === "premade" && selectedPlan && (
-        <ContentDetail item={selectedPlan} sectionId="plans" C={C} dark={dark} onClose={()=>setSelectedPlan(null)}/>
+      {/* Right column — Drill search panel */}
+      {activeBlock && (
+        <div style={{ width:300, borderLeft:`1px solid ${C.border}`, overflow:"hidden", flexShrink:0,
+          animation:"slideInRight .2s ease both" }}>
+          <DrillSearchPanel
+            block={activeBlock}
+            C={C} dark={dark}
+            onAddDrill={drill => addDrillToBlock(activeBlock.id, drill)}
+            onRemoveDrill={drill => removeDrillFromBlock(activeBlock.id, drill)}
+          />
+        </div>
       )}
     </div>
   );
