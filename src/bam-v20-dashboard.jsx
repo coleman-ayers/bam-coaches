@@ -1141,12 +1141,12 @@ function PostCard({p,C,dark,compact,onTagClick,activeTag,onProfileClick,showLike
           {/* Action bar */}
           <div style={{display:"flex",alignItems:"center",gap:4,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
             <span onClick={e=>{e.stopPropagation();like();}} className={"lbtn"+(la?" lpop":"")}
-              style={{display:"flex",alignItems:"center",gap:6,fontSize:13,color:lk?GOLD:C.textDim,
+              style={{position:"relative",display:"flex",alignItems:"center",gap:6,fontSize:13,color:lk?GOLD:C.textDim,
                 fontWeight:lk?700:400,userSelect:"none",padding:"5px 10px",borderRadius:8,
                 background:lk?(dark?"rgba(226,221,159,0.1)":"rgba(226,221,159,0.15)"):"transparent"}}>
               <Ic.Heart c={lk?GOLD:C.textDim} f={lk} s={15}/>{p.likes+(lk?1:0)}
+              {hintVis&&<div style={{position:"absolute",top:"100%",left:0,fontSize:10,color:C.textDim,opacity:0.45,fontStyle:"italic",whiteSpace:"nowrap",marginTop:2}}>double-tap to like</div>}
             </span>
-            {hintVis&&<span style={{fontSize:11,color:C.textDim,opacity:0.5,fontStyle:"italic",marginLeft:2,transition:"opacity .5s"}}>double-click to like</span>}
             <span className="btn" onClick={e=>{e.stopPropagation();setOpen(v=>!v);}}
               style={{display:"flex",alignItems:"center",gap:6,fontSize:13,color:open?GOLD:C.textDim,
                 fontWeight:open?700:400,padding:"5px 10px",borderRadius:8,
@@ -3149,7 +3149,8 @@ const BAM_LOGO_PNG="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABkCAYAAA
 
 function OnboardingFlow({onComplete,onTourStart}){
   const [screen,setScreen]=useState(0);
-  const [name,setName]=useState("");
+  const [firstName,setFirstName]=useState("");
+  const [lastName,setLastName]=useState("");
   const [country,setCountry]=useState("");
   const [city,setCity]=useState("");
   const [customCity,setCustomCity]=useState("");
@@ -3171,13 +3172,12 @@ function OnboardingFlow({onComplete,onTourStart}){
   const generateBio=useCallback(()=>{
     const location=effectiveCity&&country?`${effectiveCity}, ${country}`:country||effectiveCity;
     const roleStr=roles.length===1?roles[0]:roles.slice(0,-1).join(", ")+" and "+roles[roles.length-1];
-    const firstName=name.trim().split(" ")[0];
     const expMap={"Under 1 year":"just getting started","1–3 years":"a few years in","3–5 years":"several years of experience","5–10 years":"over half a decade of experience","10+ years":"over a decade of experience"};
     const expPhrase=expMap[experience]||"experience";
     const ageStr=ageGroups.length===1?ageGroups[0].toLowerCase():ageGroups.slice(0,-1).map(a=>a.toLowerCase()).join(", ")+" and "+ageGroups[ageGroups.length-1].toLowerCase();
     const bio=`I'm ${firstName}, a ${roleStr.toLowerCase()} based in ${location} with ${expPhrase} working with ${ageStr} athletes. ${separates.trim().replace(/\.$/,"")}. In the next year, my goal is to ${goal1yr.trim().toLowerCase().replace(/\.$/,"")}, and long-term I'm focused on ${goal10yr.trim().toLowerCase().replace(/\.$/,"")}.`;
     setBio(bio);
-  },[name,country,effectiveCity,roles,experience,ageGroups,separates,goal1yr,goal10yr]);
+  },[firstName,country,effectiveCity,roles,experience,ageGroups,separates,goal1yr,goal10yr]);
 
   useEffect(()=>{
     if(screen===4) generateBio();
@@ -3263,8 +3263,12 @@ function OnboardingFlow({onComplete,onTourStart}){
         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:38,color:"#F5F0E8",letterSpacing:2,marginBottom:8}}>LET'S LEARN A BIT ABOUT YOU</div>
         <div style={{fontSize:13,color:"#4A4840",marginBottom:32}}>Step 1 of 4</div>
         <div style={{width:"100%",maxWidth:420,margin:"0 auto",textAlign:"left"}}>
-          <input className="ob-input" placeholder="Full name" value={name} onChange={e=>setName(e.target.value)}
-            style={{...inputStyle,maxWidth:"100%"}}/>
+          <div style={{display:"flex",gap:10,marginBottom:14}}>
+            <input className="ob-input" placeholder="First name" value={firstName} onChange={e=>setFirstName(e.target.value)}
+              style={{...inputStyle,maxWidth:"100%",flex:1,marginBottom:0}}/>
+            <input className="ob-input" placeholder="Last name" value={lastName} onChange={e=>setLastName(e.target.value)}
+              style={{...inputStyle,maxWidth:"100%",flex:1,marginBottom:0}}/>
+          </div>
           <SearchableDropdown options={OB_COUNTRIES} value={country} onChange={v=>{setCountry(v);setCity("");setCustomCity("");}} placeholder="Country" style={dropdownStyle}
             renderLabel={o=>COUNTRY_FLAGS[o]?`${COUNTRY_FLAGS[o]}  ${o}`:o}/>
           <SearchableDropdown options={cityOptions} value={city} onChange={v=>{setCity(v);if(v)setCustomCity("");}} placeholder="City" style={dropdownStyle}/>
@@ -3277,7 +3281,7 @@ function OnboardingFlow({onComplete,onTourStart}){
         <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginBottom:8}}>
           {OB_ROLES.map(r=>pillBtn(r,roles.includes(r),()=>togglePill(r,roles,setRoles)))}
         </div>
-        {ctaBtn("NEXT",()=>setScreen(2),!name.trim()||!country||(!city&&!customCity.trim())||roles.length===0)}
+        {ctaBtn("NEXT",()=>setScreen(2),!firstName.trim()||!lastName.trim()||!country||(!city&&!customCity.trim())||roles.length===0)}
       </div>
     </div>
   );
@@ -3382,10 +3386,6 @@ function TourOverlay({onComplete,onNavigate}){
     if(onNavigate) onNavigate(tourData.ids[0]);
   },[tourStep,tourData.ids,onNavigate]);
 
-  // Find the Y position of the first highlighted sidebar item for tooltip placement
-  const firstHighlightIdx=TOUR_SIDEBAR.findIndex(item=>activeIds.includes(item.id));
-  const tooltipTop=Math.max(120, 76 + firstHighlightIdx * 34);
-
   const finish=()=>{
     try{localStorage.setItem("onboardingComplete","true");}catch(e){}
     if(onNavigate) onNavigate("dashboard");
@@ -3393,6 +3393,9 @@ function TourOverlay({onComplete,onNavigate}){
   };
 
   const advance=()=>setTourStep(t=>t+1);
+
+  // Track which item is the last active one (for anchoring the inline info)
+  const lastActiveIdx=TOUR_SIDEBAR.reduce((acc,item,i)=>activeIds.includes(item.id)?i:acc,-1);
 
   return (
     <div style={{position:"fixed",inset:0,zIndex:10000,fontFamily:"'DM Sans',sans-serif",pointerEvents:"none"}}>
@@ -3402,59 +3405,59 @@ function TourOverlay({onComplete,onNavigate}){
       {/* Sidebar highlight layer */}
       <div style={{position:"absolute",top:0,left:0,width:240,bottom:0,pointerEvents:"auto"}}>
         <div style={{position:"relative",height:"100%",display:"flex",flexDirection:"column"}}>
-          {/* Sidebar header area - just spacing */}
           <div style={{height:66,flexShrink:0}}/>
           <div style={{flex:1,padding:"10px 0",overflowY:"auto"}}>
-            {TOUR_SIDEBAR.map(item=>{
+            {TOUR_SIDEBAR.map((item,idx)=>{
               const isActive=activeIds.includes(item.id);
               const isHeader=item.isHeader;
+              const isLastActive=idx===lastActiveIdx;
               if(!isActive) return <div key={item.id} style={{padding:item.indent?"7px 18px 7px 44px":`${isHeader?"10px":"9px"} 18px`,fontSize:isHeader?10:item.indent?12.5:13}}/>;
               return (
-                <div key={item.id} style={{position:"relative",
-                  padding:item.indent?"7px 18px 7px 44px":`${isHeader?"10px":"9px"} 18px`,
-                  fontSize:isHeader?10:item.indent?12.5:13,
-                  fontWeight:700,
-                  color:isHeader?GOLD:"#F2F2F2",
-                  background:isHeader?"rgba(226,221,159,0.08)":"rgba(226,221,159,0.12)",
-                  borderLeft:isHeader?"3px solid transparent":`3px solid ${GOLD}`,
-                  display:"flex",alignItems:"center",gap:isHeader?11:item.indent?10:11,
-                  letterSpacing:isHeader?.8:0,textTransform:isHeader?"uppercase":"none",
-                  borderRadius:6,margin:"0 6px"}}>
-                  <item.Icon size={isHeader?15:item.indent?14:16} color={GOLD} strokeWidth={2.2}/>
-                  {item.label}
-                  <div className="ob-tour-ring" style={{position:"absolute",inset:-2,borderRadius:8,border:`2px solid ${GOLD}`,pointerEvents:"none"}}/>
+                <div key={item.id}>
+                  <div style={{position:"relative",
+                    padding:item.indent?"7px 18px 7px 44px":`${isHeader?"10px":"9px"} 18px`,
+                    fontSize:isHeader?10:item.indent?12.5:13,
+                    fontWeight:700,
+                    color:isHeader?GOLD:"#F2F2F2",
+                    background:isHeader?"rgba(226,221,159,0.08)":"rgba(226,221,159,0.12)",
+                    borderLeft:isHeader?"3px solid transparent":`3px solid ${GOLD}`,
+                    display:"flex",alignItems:"center",gap:isHeader?11:item.indent?10:11,
+                    letterSpacing:isHeader?.8:0,textTransform:isHeader?"uppercase":"none",
+                    borderRadius:6,margin:"0 6px"}}>
+                    <item.Icon size={isHeader?15:item.indent?14:16} color={GOLD} strokeWidth={2.2}/>
+                    {item.label}
+                    <div className="ob-tour-ring" style={{position:"absolute",inset:-2,borderRadius:8,border:`2px solid ${GOLD}`,pointerEvents:"none"}}/>
+                  </div>
+                  {/* Inline info anchored directly below the last highlighted item */}
+                  {isLastActive&&(
+                    <div className="ob-fade" key={tourStep} style={{padding:"10px 18px 6px",pointerEvents:"auto"}}>
+                      <div style={{fontSize:12,color:"#B0A898",lineHeight:1.5,marginBottom:10}}>{tourData.desc}</div>
+                      <div style={{display:"flex",alignItems:"center",gap:10}}>
+                        {isLast
+                          ?<button className="ob-btn" onClick={finish}
+                            style={{padding:"6px 18px",borderRadius:7,fontSize:12,fontWeight:800,letterSpacing:1,
+                              background:GOLD,color:"#111",border:"none",fontFamily:"'Bebas Neue',sans-serif",cursor:"pointer"}}>
+                            DONE
+                          </button>
+                          :<button className="ob-btn" onClick={advance}
+                            style={{padding:"6px 16px",borderRadius:7,fontSize:12,fontWeight:700,
+                              background:"transparent",color:GOLD,border:`1px solid ${GOLD}`,
+                              fontFamily:"'DM Sans',sans-serif",cursor:"pointer"}}>
+                            Next →
+                          </button>
+                        }
+                        <div style={{display:"flex",gap:3}}>
+                          {OB_TOUR_STEPS.map((_,i)=>(
+                            <div key={i} style={{width:i===tourStep?14:4,height:3,borderRadius:2,
+                              background:i<=tourStep?GOLD:"#555",transition:"all .3s"}}/>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
-          </div>
-        </div>
-      </div>
-      {/* Tooltip anchored next to sidebar */}
-      <div className="ob-fade" key={tourStep} style={{position:"absolute",left:248,top:tooltipTop,width:280,pointerEvents:"auto"}}>
-        <div style={{position:"absolute",left:-6,top:14,width:0,height:0,borderTop:"6px solid transparent",borderBottom:"6px solid transparent",borderRight:`6px solid rgba(36,36,36,0.95)`}}/>
-        <div style={{background:"rgba(36,36,36,0.95)",border:`1px solid ${GOLD}40`,borderRadius:10,padding:"16px 20px",backdropFilter:"blur(12px)"}}>
-          <div style={{fontSize:16,fontWeight:700,color:GOLD,marginBottom:4}}>{tourData.label}</div>
-          <div style={{fontSize:13,color:"#B0A898",marginBottom:14,lineHeight:1.5}}>{tourData.desc}</div>
-          <div style={{display:"flex",alignItems:"center",gap:12}}>
-            {isLast
-              ?<button className="ob-btn" onClick={finish}
-                style={{padding:"8px 24px",borderRadius:8,fontSize:13,fontWeight:800,letterSpacing:1,
-                  background:GOLD,color:"#111",border:"none",fontFamily:"'Bebas Neue',sans-serif",cursor:"pointer"}}>
-                DONE
-              </button>
-              :<button className="ob-btn" onClick={advance}
-                style={{padding:"8px 20px",borderRadius:8,fontSize:13,fontWeight:700,
-                  background:"transparent",color:GOLD,border:`1px solid ${GOLD}`,
-                  fontFamily:"'DM Sans',sans-serif",cursor:"pointer"}}>
-                Next →
-              </button>
-            }
-            <div style={{display:"flex",gap:4}}>
-              {OB_TOUR_STEPS.map((_,i)=>(
-                <div key={i} style={{width:i===tourStep?16:5,height:3,borderRadius:2,
-                  background:i<=tourStep?GOLD:"#555",transition:"all .3s"}}/>
-              ))}
-            </div>
           </div>
         </div>
       </div>
