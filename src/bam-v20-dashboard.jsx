@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { LayoutDashboard, Users, Target, Megaphone, Brain, Lightbulb, Clipboard, FileText, Zap, GraduationCap, Play, Clock, ChevronLeft, Share2, Lock, CheckCircle, Filter, X, BookOpen, Pen, Trash2, Download, Globe2, ExternalLink, Headphones, BookMarked, Sparkles, ChevronDown, Library } from "lucide-react";
+import { LayoutDashboard, Users, Target, Megaphone, Brain, Lightbulb, Clipboard, FileText, Zap, GraduationCap, Play, Clock, ChevronLeft, Share2, Lock, CheckCircle, Filter, X, BookOpen, Pen, Trash2, Download, Globe2, ExternalLink, Headphones, BookMarked, Sparkles, ChevronDown, Library, Video, CalendarDays } from "lucide-react";
 
 const LOGO = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='40'%3E%3Ctext x='17' y='28' font-family='sans-serif' font-size='13' font-weight='900' fill='%23E2DD9F' text-anchor='middle'%3EBAM%3C/text%3E%3C/svg%3E";
 const GOLD = "#E2DD9F";
@@ -11,6 +11,51 @@ function logEvent(name, data = {}) {
     events.push({ name, ...data, ts: Date.now() });
     localStorage.setItem("bam_analytics_events", JSON.stringify(events));
   } catch {}
+}
+
+// ── CALLS HELPERS ──────────────────────────────────────────────────────────
+const WEEKLY_MEET_LINK = "https://meet.google.com/bam-coaches-weekly";
+
+function getNextMondays(count) {
+  const dates = [];
+  const d = new Date();
+  // find next Monday (or today if Monday)
+  const day = d.getDay();
+  const diff = day === 0 ? 1 : day === 1 ? 0 : 8 - day;
+  d.setDate(d.getDate() + diff);
+  d.setHours(19, 0, 0, 0); // 7 PM
+  for (let i = 0; i < count; i++) {
+    dates.push(new Date(d));
+    d.setDate(d.getDate() + 7);
+  }
+  return dates;
+}
+
+function getAdHocCalls() {
+  try { return JSON.parse(localStorage.getItem("bam_adhoc_calls") || "[]"); } catch { return []; }
+}
+
+function getAllUpcomingCalls() {
+  const now = Date.now();
+  const weeklyCalls = getNextMondays(8).map((d, i) => ({
+    id: `weekly-${i}`, title: "BAM Coaches Weekly Call", dateTime: d.getTime(),
+    meetLink: WEEKLY_MEET_LINK, type: "weekly",
+  }));
+  const adHoc = getAdHocCalls().map(c => ({
+    ...c, dateTime: new Date(c.dateTime).getTime(), type: "adhoc",
+  }));
+  return [...weeklyCalls, ...adHoc].filter(c => c.dateTime > now).sort((a, b) => a.dateTime - b.dateTime);
+}
+
+function fmtCountdown(ms) {
+  if (ms <= 0) return "Now";
+  const d = Math.floor(ms / 86400000);
+  const h = Math.floor((ms % 86400000) / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  return `${m}m ${s}s`;
 }
 
 const DARK = {
@@ -3951,6 +3996,8 @@ export default function BAMFull(){
   const [favDrills,setFavDrills]=useState([]);
   const [myProfileOpen,setMyProfileOpen]=useState(false);
   const [mapOpen,setMapOpen]=useState(false);
+  const [callBanner,setCallBanner]=useState(null);
+  const [now,setNow]=useState(Date.now());
   const toggleFav=(item,sectionId)=>setFavDrills(prev=>{
     const key=`${sectionId}-${item.id}`;
     const removing=prev.find(f=>f.key===key);
@@ -3973,6 +4020,26 @@ export default function BAMFull(){
     if(ptsRef.current) ob.observe(ptsRef.current);
     return ()=>ob.disconnect();
   },[nav]);
+
+  // Call notification timer
+  useEffect(()=>{
+    const iv=setInterval(()=>{
+      const n=Date.now();
+      setNow(n);
+      const calls=getAllUpcomingCalls();
+      const upcoming=calls.find(c=>{
+        const diff=c.dateTime-n;
+        return diff>0 && (diff<=86400000); // within 24h
+      });
+      if(upcoming){
+        const diff=upcoming.dateTime-n;
+        setCallBanner({...upcoming, diff});
+      } else {
+        setCallBanner(null);
+      }
+    },1000);
+    return ()=>clearInterval(iv);
+  },[]);
 
   const go=(id)=>{ if(id===nav) return; setNav(id); setPageKey(k=>k+1); setPtsVis(false); setActiveTag("All"); logEvent("page_view",{page:id}); };
   const cyclePrompt=()=>{ setPVis(false); setTimeout(()=>{ setPIdx(i=>(i+1)%PROMPTS.length); setPVis(true); },360); };
@@ -4013,6 +4080,20 @@ export default function BAMFull(){
           <div style={{width:7,height:7,borderRadius:"50%",background:GOLD}}/>
           {notif}
           <span className="btn" onClick={()=>setNotif(null)} style={{color:SBdim,marginLeft:6,fontSize:18,lineHeight:1}}>×</span>
+        </div>
+      )}
+
+      {/* Call notification banner */}
+      {callBanner&&callBanner.diff<=86400000&&(
+        <div style={{position:"fixed",top:notif&&notifOn?52:14,left:"50%",transform:"translateX(-50%)",zIndex:9998,background:"linear-gradient(135deg,#242424,#1A1A1A)",border:`1px solid ${GOLD}80`,borderRadius:10,padding:"10px 20px",fontSize:13,color:SBtext,display:"flex",alignItems:"center",gap:12,boxShadow:`0 8px 28px rgba(0,0,0,0.5),0 0 0 1px ${GOLD}20`,animation:"slideD .3s ease",whiteSpace:"nowrap"}}>
+          <Video size={15} color={GOLD}/>
+          <span style={{fontWeight:700,color:GOLD}}>{callBanner.title}</span>
+          <span style={{color:SBmid}}>in {fmtCountdown(callBanner.diff)}</span>
+          <a href={callBanner.meetLink} target="_blank" rel="noopener noreferrer"
+            style={{background:GOLD,color:"#111",padding:"5px 14px",borderRadius:6,fontSize:12,fontWeight:700,textDecoration:"none",fontFamily:"'DM Sans',sans-serif"}}>
+            Join
+          </a>
+          <span className="btn" onClick={()=>setCallBanner(null)} style={{color:SBdim,fontSize:16,lineHeight:1,marginLeft:2}}>×</span>
         </div>
       )}
 
@@ -4151,6 +4232,77 @@ export default function BAMFull(){
             <div ref={scrollRef} onScroll={e=>setScrollY(e.target.scrollTop)} style={{flex:1,overflow:"auto",padding:28,position:"relative"}}>
               <Globe dark={dark}/>
               <div style={{maxWidth:720,margin:"0 auto",position:"relative",zIndex:1}}>
+
+                {/* ── Next Call + Calendar ── */}
+                {(()=>{
+                  const calls=getAllUpcomingCalls();
+                  const next=calls[0];
+                  if(!next) return null;
+                  const nextDate=new Date(next.dateTime);
+                  const diff=next.dateTime-now;
+
+                  // Monthly calendar
+                  const calMonth=nextDate.getMonth();
+                  const calYear=nextDate.getFullYear();
+                  const firstDay=new Date(calYear,calMonth,1).getDay();
+                  const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
+                  const callDays=new Set(calls.filter(c=>{const d=new Date(c.dateTime);return d.getMonth()===calMonth&&d.getFullYear()===calYear;}).map(c=>new Date(c.dateTime).getDate()));
+                  const today=new Date();
+                  const todayDate=today.getMonth()===calMonth&&today.getFullYear()===calYear?today.getDate():-1;
+
+                  return (
+                    <div style={{marginBottom:24}}>
+                      {/* Next Call Card */}
+                      <div style={{background:`linear-gradient(135deg,${dark?"#2A2A1A":"#FDFCF0"},${dark?"#242424":"#FFF"})`,border:`1px solid ${GOLD}50`,borderRadius:14,padding:22,marginBottom:16,display:"flex",alignItems:"center",gap:18}}>
+                        <div style={{width:52,height:52,borderRadius:14,background:`${GOLD}18`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                          <Video size={24} color={GOLD}/>
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:16,fontWeight:800,color:C.text,marginBottom:2}}>{next.title}</div>
+                          <div style={{fontSize:13,color:C.textMid}}>
+                            {nextDate.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})} at {nextDate.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})} EST
+                          </div>
+                          <div style={{fontSize:12,color:GOLD,fontWeight:700,marginTop:4}}>
+                            {diff>0?`Starts in ${fmtCountdown(diff)}`:"Happening now!"}
+                          </div>
+                        </div>
+                        <a href={next.meetLink} target="_blank" rel="noopener noreferrer"
+                          style={{display:"inline-flex",alignItems:"center",gap:6,background:GOLD,color:"#111",padding:"10px 20px",borderRadius:10,fontSize:13,fontWeight:700,textDecoration:"none",fontFamily:"'DM Sans',sans-serif",flexShrink:0}}>
+                          <Video size={14}/> Join Call
+                        </a>
+                      </div>
+
+                      {/* Monthly Calendar */}
+                      <div style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:14,padding:18}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+                          <CalendarDays size={15} color={GOLD}/>
+                          <span style={{fontSize:14,fontWeight:700,color:C.text}}>
+                            {new Date(calYear,calMonth).toLocaleDateString("en-US",{month:"long",year:"numeric"})} — Upcoming Calls
+                          </span>
+                        </div>
+                        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,textAlign:"center"}}>
+                          {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>(
+                            <div key={d} style={{fontSize:10,color:C.textDim,fontWeight:700,padding:4}}>{d}</div>
+                          ))}
+                          {Array.from({length:firstDay}).map((_,i)=><div key={`e${i}`}/>)}
+                          {Array.from({length:daysInMonth}).map((_,i)=>{
+                            const day=i+1;
+                            const hasCall=callDays.has(day);
+                            const isToday=day===todayDate;
+                            return (
+                              <div key={day} style={{padding:"6px 0",fontSize:12,borderRadius:8,fontWeight:hasCall||isToday?700:400,
+                                color:hasCall?"#111":isToday?GOLD:C.textMid,
+                                background:hasCall?GOLD:isToday?`${GOLD}18`:"transparent"}}>
+                                {day}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 <div className={focused||compose?"":"compose-pulse"} style={{background:C.bgCard,border:`1px solid ${focused?GOLD+"90":C.border}`,borderRadius:14,padding:22,marginBottom:24,transition:"border-color .25s,box-shadow .25s",boxShadow:focused?`0 0 0 4px rgba(226,221,159,0.14),0 4px 20px ${C.shadow}`:dark?"none":`0 2px 12px ${C.shadow}`}}>
                   <input ref={attachRef} type="file" multiple accept="image/*,video/*,.pdf" style={{display:"none"}} onChange={e=>{
                     const files=Array.from(e.target.files||[]);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Users, FileText, Megaphone, BarChart3, Eye, LogOut, Search, Download, MoreVertical, X, Plus, Trash2, GripVertical, ChevronDown, Clock, Send, Shield, Edit3, Check, Sun, Moon } from "lucide-react";
+import { Users, FileText, Megaphone, BarChart3, Eye, LogOut, Search, Download, MoreVertical, X, Plus, Trash2, GripVertical, ChevronDown, Clock, Send, Shield, Edit3, Check, Sun, Moon, Video } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 const GOLD = "#E2DD9F";
@@ -478,6 +478,24 @@ function AnnouncementsTab({ C }) {
   const [form, setForm] = useState({ title: "", body: "", targetRole: "All", scheduledAt: "", pinned: false });
   const [now, setNow] = useState(Date.now());
 
+  // Ad hoc calls
+  const [adHocCalls, setAdHocCalls] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("bam_adhoc_calls") || "[]"); } catch { return []; }
+  });
+  const [callForm, setCallForm] = useState({ title: "", date: "", time: "", meetLink: "" });
+  const saveCall = () => {
+    const newCall = { id: Date.now(), title: callForm.title, dateTime: `${callForm.date}T${callForm.time}`, meetLink: callForm.meetLink };
+    const updated = [...adHocCalls, newCall];
+    setAdHocCalls(updated);
+    try { localStorage.setItem("bam_adhoc_calls", JSON.stringify(updated)); } catch {}
+    setCallForm({ title: "", date: "", time: "", meetLink: "" });
+  };
+  const deleteCall = (id) => {
+    const updated = adHocCalls.filter(c => c.id !== id);
+    setAdHocCalls(updated);
+    try { localStorage.setItem("bam_adhoc_calls", JSON.stringify(updated)); } catch {}
+  };
+
   useEffect(() => { const i = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(i); }, []);
 
   const resetForm = () => setForm({ title: "", body: "", targetRole: "All", scheduledAt: "", pinned: false });
@@ -583,6 +601,55 @@ function AnnouncementsTab({ C }) {
           </div>
         </Modal>
       )}
+
+      {/* Ad Hoc Calls */}
+      <div style={{ marginTop: 32 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ fontFamily: hf, fontSize: 22, color: TEXT, letterSpacing: 2 }}>SCHEDULE AD HOC CALL</div>
+        </div>
+        <div style={{ ...cardStyle, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <div>
+            <label style={{ fontSize: 11, color: MID, display: "block", marginBottom: 4 }}>Call Title</label>
+            <input style={inputBase} placeholder="e.g. Film Review Session" value={callForm.title}
+              onChange={e => setCallForm(f => ({ ...f, title: e.target.value }))} />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: MID, display: "block", marginBottom: 4 }}>Google Meet Link</label>
+            <input style={inputBase} placeholder="https://meet.google.com/..." value={callForm.meetLink}
+              onChange={e => setCallForm(f => ({ ...f, meetLink: e.target.value }))} />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: MID, display: "block", marginBottom: 4 }}>Date</label>
+            <input type="date" style={inputBase} value={callForm.date}
+              onChange={e => setCallForm(f => ({ ...f, date: e.target.value }))} />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: MID, display: "block", marginBottom: 4 }}>Time</label>
+            <input type="time" style={inputBase} value={callForm.time}
+              onChange={e => setCallForm(f => ({ ...f, time: e.target.value }))} />
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <button style={{ ...btnStyle(true), justifyContent: "center", padding: "10px 0", width: "100%" }}
+              onClick={saveCall} disabled={!callForm.title.trim() || !callForm.date || !callForm.time}>
+              <Video size={14} /> Schedule Call
+            </button>
+          </div>
+        </div>
+
+        {adHocCalls.length > 0 && (
+          <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
+            {adHocCalls.map(c => (
+              <div key={c.id} style={{ ...cardStyle, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px" }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: TEXT }}>{c.title}</div>
+                  <div style={{ fontSize: 12, color: DIM }}>{new Date(c.dateTime).toLocaleString()} {c.meetLink && <span>&middot; <a href={c.meetLink} target="_blank" rel="noopener noreferrer" style={{ color: GOLD }}>Meet Link</a></span>}</div>
+                </div>
+                <Trash2 size={14} color="#E57373" style={{ cursor: "pointer", flexShrink: 0 }} onClick={() => deleteCall(c.id)} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
