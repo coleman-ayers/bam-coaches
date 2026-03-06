@@ -512,29 +512,57 @@ const PLAN_TEMPLATES = {
 };
 
 let blockIdCounter = 100;
-const newBlock = (typeId, overrides = {}) => ({
-  id: ++blockIdCounter,
-  type: typeId,
-  customName: "",
-  duration: 10,
-  notes: "",
-  drills: [],
-  ...overrides,
-});
+const newBlock = (typeId, overrides = {}) => {
+  const { sub } = findBlockMeta(typeId);
+  const base = {
+    id: ++blockIdCounter,
+    type: typeId,
+    customName: "",
+    duration: 10,
+    notes: "",
+    drills: [],
+  };
+  // PDP blocks get structured slots instead of a flat drills array
+  if (sub?.isPDP) {
+    base.pdpSlots = { game1: null, drill: null, game2: null };
+  }
+  return { ...base, ...overrides };
+};
 
 // ── DRILL SEARCH PANEL (right column) ──────────────────────────────────────
-function DrillSearchPanel({ block, C, dark, onAddDrill, onRemoveDrill }) {
+function DrillSearchPanel({ block, C, dark, onAddDrill, onRemoveDrill, pdpSlot, pdpSlotLabel }) {
   const { category, sub } = findBlockMeta(block.type);
   const [search, setSearch] = useState("");
   const color = category.color;
-  const label = sub ? sub.label : category.label;
+  const label = pdpSlotLabel || (sub ? sub.label : category.label);
+  const isPDP = sub?.isPDP && pdpSlot;
 
-  const relevantDrills = getDrillsForBlock(block.type);
+  // For PDP slots, filter differently: game slots get competitive/game content, drill slot gets skill content
+  const relevantDrills = (() => {
+    if (isPDP) {
+      if (pdpSlot === "drill") {
+        return ALL_DRILLS.filter(d => d.section === "pd" || d.section === "insights");
+      }
+      // game1 / game2 — competitive games, SSGs, team drills
+      return ALL_DRILLS.filter(d => d.section === "team" || d.tag === "Competitive" || d.tag === "1v1" || d.sub?.includes("Game"));
+    }
+    return getDrillsForBlock(block.type);
+  })();
+
   const filtered = relevantDrills.filter(d => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return d.title.toLowerCase().includes(q) || d.tag?.toLowerCase().includes(q) || d.desc?.toLowerCase().includes(q);
   }).slice(0, 20);
+
+  // Check if drill is already in this block (or this PDP slot)
+  const isDrillAdded = (drill) => {
+    if (isPDP) {
+      const slotDrill = block.pdpSlots?.[pdpSlot];
+      return slotDrill && slotDrill.id === drill.id && slotDrill.section === drill.section;
+    }
+    return block.drills.some(d => d.id === drill.id && d.section === drill.section);
+  };
 
   return (
     <div style={{ display:"flex", flexDirection:"column", height:"100%" }}>
@@ -567,7 +595,7 @@ function DrillSearchPanel({ block, C, dark, onAddDrill, onRemoveDrill }) {
           <div style={{ textAlign:"center", padding:"40px 0", color:C.textDim, fontSize:13 }}>No drills found.</div>
         )}
         {filtered.map(drill => {
-          const alreadyAdded = block.drills.some(d => d.id === drill.id && d.section === drill.section);
+          const alreadyAdded = isDrillAdded(drill);
           const thumbColor = (SECTION_COLORS[drill.section] || SECTION_COLORS.pd)[drill.id % 8];
           return (
             <div key={`${drill.section}-${drill.id}`} style={{
@@ -583,7 +611,10 @@ function DrillSearchPanel({ block, C, dark, onAddDrill, onRemoveDrill }) {
               </div>
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:12, fontWeight:700, color:C.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{drill.title}</div>
-                <div style={{ fontSize:10, color:C.textDim }}>{drill.sectionLabel} · {drill.tag} · {drill.duration}</div>
+                <div style={{ fontSize:10, color:C.textDim }}>
+                  {drill.sectionLabel} · {drill.tag} · {drill.duration}
+                  {drill.level && <span> · {drill.level}</span>}
+                </div>
               </div>
               <div style={{ flexShrink:0, width:26, height:26, borderRadius:7,
                 background: alreadyAdded ? GOLD : "transparent",
@@ -609,17 +640,20 @@ function PracticePlansPage({ C, dark }) {
   const [dragIdx, setDragIdx] = useState(null);
   const [dropIdx, setDropIdx] = useState(null);
   const [saved, setSaved] = useState(false);
-  const [showBlockMenu, setShowBlockMenu] = useState(false);
-  const [blockSubMenu, setBlockSubMenu] = useState(null);
   const [activeBlockId, setActiveBlockId] = useState(null);
+  const [activePdpSlot, setActivePdpSlot] = useState(null); // "game1" | "drill" | "game2" | null
   const [savedPlans, setSavedPlans] = useState(() => {
     try { return JSON.parse(localStorage.getItem("bam_saved_plans") || "[]"); } catch { return []; }
   });
+  const [expandedCat, setExpandedCat] = useState(null);
   const [customBlockName, setCustomBlockName] = useState("");
-  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [showSavedPlans, setShowSavedPlans] = useState(false);
+  // Palette drag state
+  const [paletteDrag, setPaletteDrag] = useState(null); // typeId being dragged from palette
+  const [canvasDropIdx, setCanvasDropIdx] = useState(null);
   // Drill drag state
-  const [drillDrag, setDrillDrag] = useState(null); // { blockId, drillIdx }
-  const [drillDropTarget, setDrillDropTarget] = useState(null); // { blockId, drillIdx }
+  const [drillDrag, setDrillDrag] = useState(null);
+  const [drillDropTarget, setDrillDropTarget] = useState(null);
 
   const totalMins = blocks.reduce((s, b) => s + b.duration, 0);
 
@@ -629,22 +663,29 @@ function PracticePlansPage({ C, dark }) {
     setPlanName(key === "60min" ? "60-Min Skill Session" : key === "90min" ? "90-Min Team Practice" : "");
     setSaved(false);
     setActiveBlockId(null);
+    setActivePdpSlot(null);
+  };
+
+  const insertBlockAt = (typeId, idx, customName) => {
+    const b = newBlock(typeId, customName ? { customName } : {});
+    setBlocks(prev => { const a = [...prev]; a.splice(idx, 0, b); return a; });
+    setActiveBlockId(b.id);
+    setActivePdpSlot(null);
+    setSaved(false);
+    return b;
   };
 
   const addBlock = (typeId, customName) => {
     const b = newBlock(typeId, customName ? { customName } : {});
     setBlocks(prev => [...prev, b]);
     setActiveBlockId(b.id);
-    setShowBlockMenu(false);
-    setBlockSubMenu(null);
-    setShowCustomInput(false);
-    setCustomBlockName("");
+    setActivePdpSlot(null);
     setSaved(false);
   };
 
   const removeBlock = (id) => {
     setBlocks(b => b.filter(x => x.id !== id));
-    if (activeBlockId === id) setActiveBlockId(null);
+    if (activeBlockId === id) { setActiveBlockId(null); setActivePdpSlot(null); }
     setSaved(false);
   };
 
@@ -653,6 +694,18 @@ function PracticePlansPage({ C, dark }) {
     setSaved(false);
   };
 
+  // PDP slot handlers
+  const setPdpSlotDrill = (blockId, slot, drill) => {
+    setBlocks(b => b.map(x => x.id === blockId
+      ? { ...x, pdpSlots: { ...x.pdpSlots, [slot]: drill ? { ...drill, drillNotes: "" } : null } }
+      : x));
+    setSaved(false);
+  };
+  const clearPdpSlot = (blockId, slot) => {
+    setPdpSlotDrill(blockId, slot, null);
+  };
+
+  // Regular drill handlers
   const addDrillToBlock = (blockId, drill) => {
     setBlocks(b => b.map(x => x.id === blockId
       ? { ...x, drills: x.drills.some(d => d.id === drill.id && d.section === drill.section) ? x.drills : [...x.drills, { ...drill, drillNotes: "" }] }
@@ -672,27 +725,45 @@ function PracticePlansPage({ C, dark }) {
     setSaved(false);
   };
 
-  // Block drag handlers
+  // Block drag handlers (reorder on canvas)
   const onBlockDragStart = (e, idx) => {
     setDragIdx(idx);
     e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", "block");
+    e.dataTransfer.setData("text/plain", "block-reorder");
   };
-  const onBlockDragOver = (e, idx) => {
+  const onCanvasDragOver = (e, idx) => {
     e.preventDefault();
-    if (dragIdx === null) return;
-    setDropIdx(idx);
+    // Accept both palette drags and block reorder drags
+    if (dragIdx !== null) setDropIdx(idx);
+    if (paletteDrag) setCanvasDropIdx(idx);
   };
-  const onBlockDrop = (e, idx) => {
+  const onCanvasDrop = (e, idx) => {
     e.preventDefault();
-    if (dragIdx === null || dragIdx === idx) { setDragIdx(null); setDropIdx(null); return; }
-    const arr = [...blocks];
-    const [moved] = arr.splice(dragIdx, 1);
-    arr.splice(idx > dragIdx ? idx : idx, 0, moved);
-    setBlocks(arr);
+    // Palette drag → insert new block
+    if (paletteDrag) {
+      insertBlockAt(paletteDrag, idx);
+      setPaletteDrag(null);
+      setCanvasDropIdx(null);
+      return;
+    }
+    // Block reorder
+    if (dragIdx !== null && dragIdx !== idx) {
+      const arr = [...blocks];
+      const [moved] = arr.splice(dragIdx, 1);
+      arr.splice(idx > dragIdx ? idx - 1 : idx, 0, moved);
+      setBlocks(arr);
+    }
     setDragIdx(null); setDropIdx(null); setSaved(false);
   };
   const onBlockDragEnd = () => { setDragIdx(null); setDropIdx(null); };
+
+  // Palette drag handlers
+  const onPaletteDragStart = (e, typeId) => {
+    setPaletteDrag(typeId);
+    e.dataTransfer.effectAllowed = "copy";
+    e.dataTransfer.setData("text/plain", "palette-block");
+  };
+  const onPaletteDragEnd = () => { setPaletteDrag(null); setCanvasDropIdx(null); };
 
   // Drill drag handlers (within and between blocks)
   const onDrillDragStart = (e, blockId, drillIdx) => {
@@ -737,18 +808,23 @@ function PracticePlansPage({ C, dark }) {
   // Save plan
   const savePlan = () => {
     if (blocks.length === 0) return;
-    const name = planName.trim() || "Untitled Plan";
+    const name = planName.trim() || prompt("Plan name:") || "Untitled Plan";
     const plan = {
       id: Date.now(),
       name,
       blocks: blocks.map(b => ({
         type: b.type, customName: b.customName, duration: b.duration, notes: b.notes,
         drills: b.drills.map(d => ({ id:d.id, section:d.section, title:d.title, drillNotes:d.drillNotes||"" })),
+        pdpSlots: b.pdpSlots ? {
+          game1: b.pdpSlots.game1 ? { id:b.pdpSlots.game1.id, section:b.pdpSlots.game1.section, title:b.pdpSlots.game1.title } : null,
+          drill: b.pdpSlots.drill ? { id:b.pdpSlots.drill.id, section:b.pdpSlots.drill.section, title:b.pdpSlots.drill.title } : null,
+          game2: b.pdpSlots.game2 ? { id:b.pdpSlots.game2.id, section:b.pdpSlots.game2.section, title:b.pdpSlots.game2.title } : null,
+        } : undefined,
       })),
       totalMins,
       createdAt: new Date().toISOString(),
     };
-    const updated = [plan, ...savedPlans.filter(p => p.id !== plan.id)];
+    const updated = [plan, ...savedPlans.filter(p => p.name !== name)];
     setSavedPlans(updated);
     try { localStorage.setItem("bam_saved_plans", JSON.stringify(updated)); } catch {}
     setPlanName(name);
@@ -761,13 +837,25 @@ function PracticePlansPage({ C, dark }) {
     setPlanName(plan.name);
     setBlocks(plan.blocks.map(b => {
       const block = newBlock(b.type, { customName: b.customName || "", duration: b.duration, notes: b.notes || "" });
-      block.drills = b.drills.map(d => {
+      block.drills = (b.drills || []).map(d => {
         const full = ALL_DRILLS.find(ad => ad.id === d.id && ad.section === d.section);
         return full ? { ...full, drillNotes: d.drillNotes || "" } : { id:d.id, section:d.section, title:d.title, drillNotes:d.drillNotes||"" };
       });
+      if (b.pdpSlots) {
+        block.pdpSlots = {};
+        ["game1","drill","game2"].forEach(slot => {
+          if (b.pdpSlots[slot]) {
+            const full = ALL_DRILLS.find(ad => ad.id === b.pdpSlots[slot].id && ad.section === b.pdpSlots[slot].section);
+            block.pdpSlots[slot] = full ? { ...full, drillNotes: "" } : b.pdpSlots[slot];
+          } else {
+            block.pdpSlots[slot] = null;
+          }
+        });
+      }
       return block;
     }));
     setActiveBlockId(null);
+    setActivePdpSlot(null);
     setSaved(true);
   };
 
@@ -790,14 +878,16 @@ function PracticePlansPage({ C, dark }) {
       .block-header .type{font-weight:700;font-size:14px;}
       .block-header .dur{font-size:12px;color:#888;}
       .block-notes{padding:8px 16px;font-size:12px;color:#555;font-style:italic;border-bottom:1px solid #f0f0f0;}
-      .drill{padding:8px 16px;font-size:13px;border-bottom:1px solid #f5f5f5;display:flex;gap:8px;align-items:flex-start;}
+      .drill{padding:8px 16px;font-size:13px;border-bottom:1px solid #f5f5f5;}
       .drill:last-child{border-bottom:none;}
       .drill-title{font-weight:600;}
       .drill-notes{font-size:11px;color:#888;margin-top:2px;font-style:italic;}
+      .pdp-slot{padding:8px 16px;border-bottom:1px solid #f5f5f5;}
+      .pdp-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:3px;}
       @media print{body{margin:20px;}}
     </style></head><body>`;
     html += `<h1>${name}</h1>`;
-    html += `<div class="meta">${totalMins} minutes | ${blocks.length} blocks | ${blocks.reduce((s,b)=>s+b.drills.length,0)} drills</div>`;
+    html += `<div class="meta">${totalMins} minutes | ${blocks.length} blocks</div>`;
     let cumMins = 0;
     blocks.forEach(b => {
       const { category, sub } = findBlockMeta(b.type);
@@ -805,12 +895,19 @@ function PracticePlansPage({ C, dark }) {
       html += `<div class="block">`;
       html += `<div class="block-header"><span class="type">${blockLabel}</span><span class="dur">${cumMins}-${cumMins+b.duration} min (${b.duration} min)</span></div>`;
       if (b.notes) html += `<div class="block-notes">${b.notes}</div>`;
-      b.drills.forEach(d => {
-        html += `<div class="drill"><div><div class="drill-title">${d.title}</div>`;
-        if (d.drillNotes) html += `<div class="drill-notes">${d.drillNotes}</div>`;
-        html += `</div></div>`;
-      });
-      if (b.drills.length === 0) html += `<div class="drill" style="color:#aaa">No drills added</div>`;
+      if (b.pdpSlots) {
+        [["game1","Game 1"],["drill","Drill"],["game2","Game 2"]].forEach(([key,lbl]) => {
+          const sd = b.pdpSlots[key];
+          html += `<div class="pdp-slot"><div class="pdp-label">${lbl}</div><div class="drill-title">${sd ? sd.title : "Empty"}</div></div>`;
+        });
+      } else {
+        b.drills.forEach(d => {
+          html += `<div class="drill"><div class="drill-title">${d.title}</div>`;
+          if (d.drillNotes) html += `<div class="drill-notes">${d.drillNotes}</div>`;
+          html += `</div>`;
+        });
+        if (b.drills.length === 0) html += `<div class="drill" style="color:#aaa">No drills added</div>`;
+      }
       html += `</div>`;
       cumMins += b.duration;
     });
@@ -822,59 +919,134 @@ function PracticePlansPage({ C, dark }) {
   };
 
   const activeBlock = blocks.find(b => b.id === activeBlockId);
+  const showDropZone = (idx) => {
+    if (dragIdx !== null && dropIdx === idx && dragIdx !== idx) return true;
+    if (paletteDrag && canvasDropIdx === idx) return true;
+    return false;
+  };
+
+  // PDP slot labels
+  const PDP_SLOT_META = {
+    game1: { label:"Game 1", color:"#9E6B7A", filterLabel:"Game 1 - Competitive" },
+    drill: { label:"Drill", color:"#6B9E7A", filterLabel:"Drill - Skill Work" },
+    game2: { label:"Game 2", color:"#9E6B7A", filterLabel:"Game 2 - Competitive" },
+  };
 
   return (
     <div style={{ display:"flex", flex:1, overflow:"hidden", height:"100%" }}>
-      {/* Left sidebar — Saved Plans */}
-      <div style={{ width:200, borderRight:`1px solid ${C.border}`, display:"flex", flexDirection:"column", overflow:"hidden", flexShrink:0 }}>
+      {/* Left sidebar — Block Palette */}
+      <div style={{ width:210, borderRight:`1px solid ${C.border}`, display:"flex", flexDirection:"column", overflow:"hidden", flexShrink:0 }}>
         <div style={{ padding:"18px 14px 10px", borderBottom:`1px solid ${C.border}`, flexShrink:0 }}>
-          <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:18, color:GOLD, letterSpacing:1.5, marginBottom:2 }}>SAVED PLANS</div>
-          <div style={{ fontSize:11, color:C.textDim }}>{savedPlans.length} plan{savedPlans.length!==1?"s":""}</div>
+          <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:18, color:GOLD, letterSpacing:1.5, marginBottom:2 }}>BLOCK PALETTE</div>
+          <div style={{ fontSize:10, color:C.textDim }}>Drag blocks onto your plan</div>
         </div>
-        <div style={{ flex:1, overflowY:"auto", padding:"8px 10px" }}>
-          {/* New plan button */}
-          <div className="btn" onClick={() => { setBlocks([]); setPlanName(""); setActiveBlockId(null); setSaved(false); }}
-            style={{ display:"flex", alignItems:"center", gap:7, padding:"9px 10px", borderRadius:8,
-              background:GOLD+"18", border:`1px dashed ${GOLD}50`, marginBottom:10,
-              fontSize:12, fontWeight:700, color:GOLD, cursor:"pointer" }}>
-            <Plus size={13} color={GOLD}/> New Plan
-          </div>
-          {/* Templates */}
-          <div style={{ fontSize:10, fontWeight:800, color:C.textDim, letterSpacing:1, textTransform:"uppercase", marginBottom:6, marginTop:4 }}>Templates</div>
-          {[["60min","60-Min Session"],["90min","90-Min Team"]].map(([k,l]) => (
-            <div key={k} className="btn" onClick={() => loadTemplate(k)}
-              style={{ fontSize:11, fontWeight:600, color:C.textMid, padding:"7px 10px",
-                borderRadius:7, border:`1px solid ${C.border}`, marginBottom:5,
-                background:C.bgHover }}>
-              {l}
-            </div>
-          ))}
-          {savedPlans.length > 0 && (
-            <>
-              <div style={{ fontSize:10, fontWeight:800, color:C.textDim, letterSpacing:1, textTransform:"uppercase", marginBottom:6, marginTop:14 }}>Your Plans</div>
-              {savedPlans.map(p => (
-                <div key={p.id} style={{ padding:"8px 10px", borderRadius:7, border:`1px solid ${C.border}`,
-                  marginBottom:5, background:C.bgHover, cursor:"pointer", position:"relative" }}>
-                  <div className="btn" onClick={() => loadSavedPlan(p)}>
-                    <div style={{ fontSize:12, fontWeight:700, color:C.text, marginBottom:2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.name}</div>
-                    <div style={{ fontSize:10, color:C.textDim }}>{p.totalMins} min · {p.blocks.length} blocks</div>
+        <div style={{ flex:1, overflowY:"auto", padding:"10px 10px 6px" }}>
+          {BLOCK_CATEGORIES.map(cat => {
+            const hasSubs = cat.subs.length > 0;
+            const isExpanded = expandedCat === cat.id;
+            return (
+              <div key={cat.id} style={{ marginBottom:4 }}>
+                <div
+                  draggable={!hasSubs && !cat.isCustom}
+                  onDragStart={e => !hasSubs && !cat.isCustom && onPaletteDragStart(e, cat.id)}
+                  onDragEnd={onPaletteDragEnd}
+                  className="pp-block"
+                  onClick={() => {
+                    if (hasSubs) setExpandedCat(isExpanded ? null : cat.id);
+                    else if (cat.isCustom) { /* handled below */ }
+                    else addBlock(cat.id);
+                  }}
+                  style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 10px", borderRadius:8,
+                    background:C.bgHover, border:`1px solid ${C.border}`,
+                    cursor: hasSubs ? "pointer" : (cat.isCustom ? "pointer" : "grab") }}>
+                  <div style={{ width:28, height:28, borderRadius:7, background:cat.color+"25",
+                    border:`1px solid ${cat.color}50`, display:"flex", alignItems:"center",
+                    justifyContent:"center", flexShrink:0 }}>
+                    {(BLOCK_ICON_MAP[cat.icon] || BLOCK_ICON_MAP.custom)(cat.color, 13)}
                   </div>
-                  <div className="btn" onClick={() => deleteSavedPlan(p.id)}
-                    style={{ position:"absolute", top:8, right:8 }}>
-                    <Trash2 size={10} color={C.textDim}/>
-                  </div>
+                  <span style={{ fontSize:11, fontWeight:700, color:C.text, flex:1, lineHeight:1.2 }}>{cat.label}</span>
+                  {hasSubs && (isExpanded ? <ChevronDown size={12} color={C.textDim}/> : <ChevronRight size={12} color={C.textDim}/>)}
                 </div>
-              ))}
-            </>
-          )}
+                {/* Sub-types */}
+                {isExpanded && hasSubs && (
+                  <div style={{ marginLeft:12, marginTop:3 }}>
+                    {cat.subs.map(s => (
+                      <div key={s.id}
+                        draggable
+                        onDragStart={e => onPaletteDragStart(e, s.id)}
+                        onDragEnd={onPaletteDragEnd}
+                        className="pp-block"
+                        onClick={() => addBlock(s.id)}
+                        style={{ fontSize:11, fontWeight:600, color:C.textMid, padding:"6px 10px",
+                          borderRadius:6, marginBottom:3, cursor:"grab",
+                          borderLeft:`3px solid ${cat.color}40`, background:C.bgHover }}>
+                        {s.label}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* Custom block input */}
+                {cat.isCustom && (
+                  <div style={{ marginTop:3, display:"flex", gap:4 }}>
+                    <input value={customBlockName} onChange={e => setCustomBlockName(e.target.value)}
+                      onKeyDown={e => { if (e.key==="Enter" && customBlockName.trim()) { addBlock("custom", customBlockName.trim()); setCustomBlockName(""); } }}
+                      placeholder="Custom name..."
+                      style={{ flex:1, fontSize:10, padding:"5px 8px", borderRadius:5,
+                        background:C.bgHover, border:`1px solid ${C.border}`, outline:"none",
+                        color:C.text, fontFamily:"'DM Sans',sans-serif" }}/>
+                    <div className="btn" onClick={() => { if (customBlockName.trim()) { addBlock("custom", customBlockName.trim()); setCustomBlockName(""); } }}
+                      style={{ fontSize:10, fontWeight:700, padding:"5px 8px", borderRadius:5,
+                        background:GOLD, color:"#111" }}>+</div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Templates */}
+          <div style={{ borderTop:`1px solid ${C.border}`, marginTop:10, paddingTop:10 }}>
+            <div style={{ fontSize:10, fontWeight:800, color:C.textDim, letterSpacing:1, textTransform:"uppercase", marginBottom:6 }}>Templates</div>
+            {[["60min","60-Min Session"],["90min","90-Min Team"]].map(([k,l]) => (
+              <div key={k} className="btn" onClick={() => loadTemplate(k)}
+                style={{ fontSize:11, fontWeight:600, color:C.textMid, padding:"7px 10px",
+                  borderRadius:7, border:`1px solid ${C.border}`, marginBottom:4,
+                  background:C.bgHover }}>
+                {l}
+              </div>
+            ))}
+          </div>
+
+          {/* Saved plans toggle */}
+          <div style={{ borderTop:`1px solid ${C.border}`, marginTop:10, paddingTop:10 }}>
+            <div className="btn" onClick={() => setShowSavedPlans(!showSavedPlans)}
+              style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
+              <div style={{ fontSize:10, fontWeight:800, color:C.textDim, letterSpacing:1, textTransform:"uppercase" }}>
+                Saved Plans ({savedPlans.length})
+              </div>
+              {showSavedPlans ? <ChevronUp size={11} color={C.textDim}/> : <ChevronDown size={11} color={C.textDim}/>}
+            </div>
+            {showSavedPlans && savedPlans.map(p => (
+              <div key={p.id} style={{ padding:"7px 10px", borderRadius:7, border:`1px solid ${C.border}`,
+                marginBottom:4, background:C.bgHover, cursor:"pointer", position:"relative" }}>
+                <div className="btn" onClick={() => loadSavedPlan(p)}>
+                  <div style={{ fontSize:11, fontWeight:700, color:C.text, marginBottom:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", paddingRight:16 }}>{p.name}</div>
+                  <div style={{ fontSize:9, color:C.textDim }}>{p.totalMins} min · {p.blocks.length} blocks</div>
+                </div>
+                <div className="btn" onClick={e => { e.stopPropagation(); deleteSavedPlan(p.id); }}
+                  style={{ position:"absolute", top:7, right:8 }}>
+                  <Trash2 size={9} color={C.textDim}/>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Center — Plan Builder */}
+      {/* Center — Plan Canvas */}
       <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minWidth:0 }}>
         {/* Top bar */}
         <div style={{ padding:"14px 20px", borderBottom:`1px solid ${C.border}`,
-          display:"flex", alignItems:"center", gap:12, flexShrink:0 }}>
+          display:"flex", alignItems:"center", gap:12, flexShrink:0, flexWrap:"wrap" }}>
           <FileText size={18} color={GOLD} strokeWidth={2}/>
           {editingName ? (
             <input value={planName} onChange={e => setPlanName(e.target.value)}
@@ -882,20 +1054,17 @@ function PracticePlansPage({ C, dark }) {
               autoFocus placeholder="Plan name..."
               style={{ fontSize:16, fontWeight:800, color:C.text, background:"transparent",
                 border:`1px solid ${GOLD}`, borderRadius:6, padding:"4px 10px",
-                outline:"none", fontFamily:"'DM Sans',sans-serif", minWidth:180 }}/>
+                outline:"none", fontFamily:"'DM Sans',sans-serif", minWidth:160 }}/>
           ) : (
             <div className="btn" onClick={() => setEditingName(true)}
               style={{ fontSize:16, fontWeight:800, color:C.text }}>
               {planName || "Untitled Plan"}
             </div>
           )}
-          <div style={{ display:"flex", alignItems:"center", gap:5, fontSize:12, color:C.textDim, marginLeft:8 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:5, fontSize:12, color:C.textDim, marginLeft:4 }}>
             <Clock size={12} color={C.textDim}/>{totalMins} min
           </div>
           <div style={{ fontSize:12, color:C.textDim }}>{blocks.length} blocks</div>
-          <div style={{ fontSize:12, color:C.textDim }}>
-            {blocks.reduce((s,b)=>s+b.drills.length,0)} drills
-          </div>
           <div style={{ flex:1 }}/>
           <div className="btn" onClick={exportPDF}
             style={{ fontSize:12, fontWeight:700, color:C.textMid, padding:"7px 14px", borderRadius:7,
@@ -913,8 +1082,10 @@ function PracticePlansPage({ C, dark }) {
           </div>
         </div>
 
-        {/* Plan canvas */}
-        <div style={{ flex:1, overflowY:"auto", padding:"20px 24px 40px" }}>
+        {/* Canvas scroll area */}
+        <div style={{ flex:1, overflowY:"auto", padding:"20px 24px 40px" }}
+          onDragOver={e => { e.preventDefault(); if (paletteDrag && blocks.length === 0) setCanvasDropIdx(0); }}
+          onDrop={e => { if (paletteDrag && blocks.length === 0) { e.preventDefault(); insertBlockAt(paletteDrag, 0); setPaletteDrag(null); setCanvasDropIdx(null); } }}>
           {/* Progress bar */}
           {blocks.length > 0 && (
             <div style={{ display:"flex", gap:3, marginBottom:18, height:6, borderRadius:6, overflow:"hidden" }}>
@@ -928,28 +1099,18 @@ function PracticePlansPage({ C, dark }) {
           )}
 
           {/* Empty state */}
-          {blocks.length === 0 && !showBlockMenu && (
+          {blocks.length === 0 && (
             <div style={{ display:"flex", flexDirection:"column", alignItems:"center",
-              justifyContent:"center", height:"60%", gap:14, color:C.textDim }}>
+              justifyContent:"center", height:"60%", gap:14, color:C.textDim,
+              border: paletteDrag ? `2px dashed ${GOLD}60` : "none", borderRadius:16,
+              background: paletteDrag ? (dark?"rgba(226,221,159,0.03)":"rgba(226,221,159,0.06)") : "transparent",
+              transition:"all .2s" }}>
               <FileText size={40} color={C.textDim} strokeWidth={1.2} style={{ opacity:.4 }}/>
-              <div style={{ fontSize:16, fontWeight:700 }}>Your plan is empty</div>
-              <div style={{ fontSize:13 }}>Add blocks to build your practice plan</div>
-              <div style={{ display:"flex", gap:8, marginTop:4 }}>
-                <div className="btn" onClick={() => setShowBlockMenu(true)}
-                  style={{ fontSize:13, fontWeight:700, padding:"9px 18px", borderRadius:8,
-                    background:GOLD, color:"#111" }}>
-                  Add a Block
-                </div>
-                <div className="btn" onClick={() => loadTemplate("60min")}
-                  style={{ fontSize:13, fontWeight:700, padding:"9px 18px", borderRadius:8,
-                    color:C.textMid, border:`1px solid ${C.border}` }}>
-                  Load 60-Min
-                </div>
-                <div className="btn" onClick={() => loadTemplate("90min")}
-                  style={{ fontSize:13, fontWeight:700, padding:"9px 18px", borderRadius:8,
-                    color:C.textMid, border:`1px solid ${C.border}` }}>
-                  Load 90-Min
-                </div>
+              <div style={{ fontSize:16, fontWeight:700 }}>
+                {paletteDrag ? "Drop here to add" : "Your plan is empty"}
+              </div>
+              <div style={{ fontSize:13 }}>
+                {paletteDrag ? "Release to add this block" : "Drag blocks from the palette, or load a template"}
               </div>
             </div>
           )}
@@ -960,9 +1121,8 @@ function PracticePlansPage({ C, dark }) {
             const color = category.color;
             const blockLabel = b.customName || (sub ? sub.label : category.label);
             const isDragging = dragIdx === idx;
-            const isDropBefore = dropIdx === idx && dragIdx !== null && dragIdx !== idx;
             const isActive = activeBlockId === b.id;
-            const isPDP = sub?.isPDP;
+            const isPDP = !!b.pdpSlots;
             let cumMins = 0;
             for (let i = 0; i < idx; i++) cumMins += blocks[i].duration;
 
@@ -970,27 +1130,24 @@ function PracticePlansPage({ C, dark }) {
               <div key={b.id}>
                 {/* Drop zone indicator */}
                 <div className="pp-drop-zone"
-                  onDragOver={e => onBlockDragOver(e, idx)}
-                  onDrop={e => onBlockDrop(e, idx)}
-                  style={{ height: isDropBefore ? 40 : 0, opacity: isDropBefore ? 1 : 0,
-                    display:"flex", alignItems:"center", justifyContent:"center" }}>
-                  {isDropBefore && <div style={{ width:"90%", height:3, borderRadius:2, background:GOLD }}/>}
+                  onDragOver={e => onCanvasDragOver(e, idx)}
+                  onDrop={e => onCanvasDrop(e, idx)}
+                  style={{ height: showDropZone(idx) ? 40 : 6, opacity: showDropZone(idx) ? 1 : 0,
+                    display:"flex", alignItems:"center", justifyContent:"center", transition:"height .2s ease, opacity .2s ease" }}>
+                  {showDropZone(idx) && <div style={{ width:"90%", height:3, borderRadius:2, background:GOLD }}/>}
                 </div>
 
                 <div className={`pp-block${isDragging?" dragging":""}`} draggable
                   onDragStart={e => onBlockDragStart(e, idx)}
                   onDragEnd={onBlockDragEnd}
-                  onClick={() => setActiveBlockId(isActive ? null : b.id)}
-                  style={{ marginBottom:8, borderRadius:11, background:C.bgCard,
+                  style={{ marginBottom:4, borderRadius:11, background:C.bgCard,
                     border:`1px solid ${isActive ? GOLD+"70" : C.border}`,
                     borderLeft:`4px solid ${color}`,
-                    boxShadow: isActive ? `0 2px 12px ${GOLD}15` : "none",
-                    cursor:"pointer" }}>
+                    boxShadow: isActive ? `0 2px 12px ${GOLD}15` : "none" }}>
 
                   {/* Block header row */}
-                  <div style={{ display:"flex", gap:10, alignItems:"center", padding:"12px 14px 10px" }}>
-                    <div style={{ cursor:"grab", color:C.textDim, display:"flex", alignItems:"center" }}
-                      onMouseDown={e => e.stopPropagation()}>
+                  <div style={{ display:"flex", gap:10, alignItems:"center", padding:"12px 14px 8px" }}>
+                    <div style={{ cursor:"grab", color:C.textDim, display:"flex", alignItems:"center" }}>
                       <GripVertical size={16} color={C.textDim}/>
                     </div>
                     <div style={{ width:30, height:30, borderRadius:7, background:color+"25",
@@ -1001,8 +1158,8 @@ function PracticePlansPage({ C, dark }) {
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                         {category.isCustom ? (
-                          <input value={b.customName} onChange={e => { e.stopPropagation(); updateBlock(b.id,"customName",e.target.value); }}
-                            onClick={e => e.stopPropagation()} placeholder="Block name..."
+                          <input value={b.customName} onChange={e => updateBlock(b.id,"customName",e.target.value)}
+                            placeholder="Block name..."
                             style={{ fontSize:13, fontWeight:800, color:C.text, background:"transparent",
                               border:"none", outline:"none", fontFamily:"'DM Sans',sans-serif", flex:1, minWidth:0 }}/>
                         ) : (
@@ -1015,10 +1172,10 @@ function PracticePlansPage({ C, dark }) {
                       </div>
                     </div>
                     {/* Duration selector */}
-                    <div style={{ display:"flex", alignItems:"center", gap:4, flexShrink:0 }} onClick={e => e.stopPropagation()}>
+                    <div style={{ display:"flex", alignItems:"center", gap:3, flexShrink:0 }}>
                       {DURATION_PRESETS.map(d => (
                         <div key={d} className="btn" onClick={() => updateBlock(b.id,"duration",d)}
-                          style={{ width:28, height:24, borderRadius:5, fontSize:10, fontWeight:700,
+                          style={{ width:26, height:22, borderRadius:4, fontSize:10, fontWeight:700,
                             display:"flex", alignItems:"center", justifyContent:"center",
                             background: b.duration===d ? GOLD : C.bgHover,
                             color: b.duration===d ? "#111" : C.textDim,
@@ -1028,19 +1185,19 @@ function PracticePlansPage({ C, dark }) {
                       ))}
                       <input type="number" min={1} max={120} value={b.duration}
                         onChange={e => updateBlock(b.id,"duration",Math.max(1,parseInt(e.target.value)||1))}
-                        style={{ width:36, background:C.bgHover, border:`1px solid ${C.border}`, borderRadius:5,
-                          outline:"none", fontSize:11, fontWeight:700, color:C.text,
-                          fontFamily:"'DM Sans',sans-serif", textAlign:"center", padding:"3px 2px" }}/>
+                        style={{ width:34, background:C.bgHover, border:`1px solid ${C.border}`, borderRadius:4,
+                          outline:"none", fontSize:10, fontWeight:700, color:C.text,
+                          fontFamily:"'DM Sans',sans-serif", textAlign:"center", padding:"2px 1px" }}/>
                       <span style={{ fontSize:10, color:C.textDim }}>min</span>
                     </div>
-                    <div className="btn" onClick={e => { e.stopPropagation(); removeBlock(b.id); }}
-                      style={{ flexShrink:0, marginLeft:4 }}>
+                    <div className="btn" onClick={() => removeBlock(b.id)}
+                      style={{ flexShrink:0, marginLeft:2 }}>
                       <Trash2 size={13} color={C.textDim}/>
                     </div>
                   </div>
 
                   {/* Block notes */}
-                  <div style={{ padding:"0 14px 0 58px" }} onClick={e => e.stopPropagation()}>
+                  <div style={{ padding:"0 14px 4px 58px" }}>
                     <input value={b.notes} onChange={e => updateBlock(b.id,"notes",e.target.value)}
                       placeholder="Block notes..."
                       style={{ width:"100%", background:"transparent", border:"none", outline:"none",
@@ -1048,41 +1205,69 @@ function PracticePlansPage({ C, dark }) {
                         fontStyle:"italic", caretColor:GOLD }}/>
                   </div>
 
-                  {/* PDP structure */}
+                  {/* PDP structure — 3 distinct droppable slots */}
                   {isPDP && (
-                    <div style={{ padding:"8px 14px 6px 58px", display:"flex", gap:6, alignItems:"center" }}>
-                      {["Game","Drill","Game"].map((slot,i) => (
-                        <div key={i} style={{ flex:1, padding:"6px 10px", borderRadius:6,
-                          background: i===1 ? (dark?"rgba(107,158,122,0.15)":"rgba(107,158,122,0.1)") : (dark?"rgba(158,107,122,0.15)":"rgba(158,107,122,0.1)"),
-                          border:`1px solid ${i===1 ? "#6B9E7A40" : "#9E6B7A40"}`,
-                          textAlign:"center", fontSize:11, fontWeight:700,
-                          color: i===1 ? "#6B9E7A" : "#9E6B7A" }}>
-                          {slot} {i===0?"1":i===2?"2":""}
-                        </div>
-                      ))}
+                    <div style={{ padding:"6px 14px 10px 58px", display:"flex", gap:8 }}>
+                      {["game1","drill","game2"].map(slot => {
+                        const meta = PDP_SLOT_META[slot];
+                        const slotDrill = b.pdpSlots[slot];
+                        const isSlotActive = isActive && activePdpSlot === slot;
+                        const thumbColor = slotDrill ? (SECTION_COLORS[slotDrill.section]||SECTION_COLORS.pd)[(slotDrill.id||0)%8] : null;
+                        return (
+                          <div key={slot} style={{ flex:1, borderRadius:8,
+                            background: isSlotActive ? (dark?"rgba(226,221,159,0.08)":"rgba(226,221,159,0.12)") : (dark?"rgba(255,255,255,0.03)":"rgba(0,0,0,0.02)"),
+                            border:`1px solid ${isSlotActive ? GOLD+"60" : (slot==="drill" ? "#6B9E7A30" : "#9E6B7A30")}`,
+                            padding:"8px 10px", transition:"all .15s" }}>
+                            <div style={{ fontSize:9, fontWeight:800, textTransform:"uppercase", letterSpacing:.8,
+                              color: meta.color, marginBottom:6 }}>
+                              {meta.label}
+                            </div>
+                            {slotDrill ? (
+                              <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                                <div style={{ width:28, height:28, borderRadius:5, background:thumbColor, flexShrink:0,
+                                  display:"flex", alignItems:"center", justifyContent:"center" }}>
+                                  <Play size={8} color="rgba(255,255,255,0.8)" fill="rgba(255,255,255,0.8)"/>
+                                </div>
+                                <div style={{ flex:1, minWidth:0 }}>
+                                  <div style={{ fontSize:11, fontWeight:700, color:C.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{slotDrill.title}</div>
+                                </div>
+                                <div className="btn" onClick={() => clearPdpSlot(b.id, slot)} style={{ flexShrink:0 }}>
+                                  <X size={10} color={C.textDim}/>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="btn" onClick={() => { setActiveBlockId(b.id); setActivePdpSlot(slot); }}
+                                style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:4,
+                                  padding:"6px 0", borderRadius:5, border:`1px dashed ${meta.color}40`,
+                                  fontSize:10, fontWeight:600, color:C.textDim }}>
+                                <Plus size={10} color={C.textDim}/> Add
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
 
-                  {/* Drills list */}
-                  {b.drills.length > 0 && (
-                    <div style={{ padding:"8px 14px 6px 50px" }}>
+                  {/* Regular drills list (non-PDP blocks) */}
+                  {!isPDP && b.drills.length > 0 && (
+                    <div style={{ padding:"4px 14px 6px 50px" }}>
                       {b.drills.map((d, di) => {
                         const thumbColor = (SECTION_COLORS[d.section]||SECTION_COLORS.pd)[(d.id||0)%8];
                         const isDrillDragging = drillDrag?.blockId===b.id && drillDrag?.drillIdx===di;
                         const isDrillDropBefore = drillDropTarget?.blockId===b.id && drillDropTarget?.drillIdx===di && drillDrag && !(drillDrag.blockId===b.id && drillDrag.drillIdx===di);
                         return (
                           <div key={`${d.section}-${d.id}-${di}`}>
-                            {isDrillDropBefore && <div style={{ height:3, background:GOLD, borderRadius:2, margin:"4px 0" }}/>}
+                            {isDrillDropBefore && <div style={{ height:3, background:GOLD, borderRadius:2, margin:"3px 0" }}/>}
                             <div className={`pp-drill-item${isDrillDragging?" dragging":""}`}
                               draggable
                               onDragStart={e => onDrillDragStart(e, b.id, di)}
                               onDragOver={e => onDrillDragOver(e, b.id, di)}
                               onDrop={e => onDrillDrop(e, b.id, di)}
                               onDragEnd={onDrillDragEnd}
-                              onClick={e => e.stopPropagation()}
                               style={{ display:"flex", gap:8, alignItems:"center", padding:"6px 8px",
                                 borderRadius:7, background:C.bgHover, border:`1px solid ${C.border}`,
-                                marginBottom:5 }}>
+                                marginBottom:4 }}>
                               <GripVertical size={12} color={C.textDim} style={{ cursor:"grab", flexShrink:0 }}/>
                               <div style={{ width:28, height:28, borderRadius:5, background:thumbColor, flexShrink:0,
                                 display:"flex", alignItems:"center", justifyContent:"center" }}>
@@ -1105,119 +1290,39 @@ function PracticePlansPage({ C, dark }) {
                       {/* Drop zone at end of drill list */}
                       <div onDragOver={e => onDrillDragOver(e, b.id, b.drills.length)}
                         onDrop={e => onDrillDrop(e, b.id, b.drills.length)}
-                        style={{ height:drillDropTarget?.blockId===b.id && drillDropTarget?.drillIdx===b.drills.length ? 20 : 4 }}>
+                        style={{ height:drillDropTarget?.blockId===b.id && drillDropTarget?.drillIdx===b.drills.length ? 16 : 4 }}>
                         {drillDropTarget?.blockId===b.id && drillDropTarget?.drillIdx===b.drills.length && (
-                          <div style={{ height:3, background:GOLD, borderRadius:2, margin:"4px 0" }}/>
+                          <div style={{ height:3, background:GOLD, borderRadius:2, margin:"3px 0" }}/>
                         )}
                       </div>
                     </div>
                   )}
 
-                  {/* Add drills CTA */}
-                  <div style={{ padding:"4px 14px 12px 58px" }}>
-                    <div className="btn" onClick={e => { e.stopPropagation(); setActiveBlockId(b.id); }}
-                      style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"5px 12px",
-                        borderRadius:7, border:`1px dashed ${b.drills.length>0?GOLD+"50":C.border}`,
-                        fontSize:11, color:b.drills.length>0?GOLD:C.textDim, fontWeight:600 }}>
-                      <Plus size={11} color={b.drills.length>0?GOLD:C.textDim}/>
-                      {b.drills.length > 0 ? `${b.drills.length} drill${b.drills.length>1?"s":""} - add more` : "Add drills"}
+                  {/* Add drills CTA (non-PDP only) */}
+                  {!isPDP && (
+                    <div style={{ padding:"2px 14px 10px 58px" }}>
+                      <div className="btn" onClick={() => { setActiveBlockId(b.id); setActivePdpSlot(null); }}
+                        style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"5px 12px",
+                          borderRadius:7, border:`1px dashed ${b.drills.length>0?GOLD+"50":C.border}`,
+                          fontSize:11, color:b.drills.length>0?GOLD:C.textDim, fontWeight:600 }}>
+                        <Plus size={11} color={b.drills.length>0?GOLD:C.textDim}/>
+                        {b.drills.length > 0 ? `${b.drills.length} drill${b.drills.length>1?"s":""} - add more` : "Add drills"}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             );
           })}
 
-          {/* Drop zone at end for dragging blocks to bottom */}
-          {dragIdx !== null && (
+          {/* Drop zone at end for dragging to bottom */}
+          {(dragIdx !== null || paletteDrag) && blocks.length > 0 && (
             <div className="pp-drop-zone"
-              onDragOver={e => onBlockDragOver(e, blocks.length)}
-              onDrop={e => onBlockDrop(e, blocks.length)}
-              style={{ height: dropIdx === blocks.length ? 40 : 20, opacity: dropIdx === blocks.length ? 1 : 0.3,
+              onDragOver={e => onCanvasDragOver(e, blocks.length)}
+              onDrop={e => onCanvasDrop(e, blocks.length)}
+              style={{ height: showDropZone(blocks.length) ? 40 : 20, opacity: showDropZone(blocks.length) ? 1 : 0.3,
                 display:"flex", alignItems:"center", justifyContent:"center" }}>
-              {dropIdx === blocks.length && <div style={{ width:"90%", height:3, borderRadius:2, background:GOLD }}/>}
-            </div>
-          )}
-
-          {/* Add block button */}
-          {blocks.length > 0 && (
-            <div style={{ marginTop:8, position:"relative" }}>
-              <div className="btn" onClick={() => { setShowBlockMenu(!showBlockMenu); setBlockSubMenu(null); setShowCustomInput(false); }}
-                style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7,
-                  padding:"12px 0", borderRadius:10, border:`1px dashed ${GOLD}50`,
-                  background: dark ? "rgba(226,221,159,0.04)" : "rgba(226,221,159,0.08)",
-                  fontSize:13, fontWeight:700, color:GOLD, cursor:"pointer" }}>
-                <Plus size={15} color={GOLD}/> Add a Block
-              </div>
-            </div>
-          )}
-
-          {/* Block type selector menu */}
-          {showBlockMenu && (
-            <div style={{ marginTop:8, background:C.bgCard, border:`1px solid ${C.border}`, borderRadius:12,
-              padding:10, boxShadow:`0 8px 30px ${C.shadow}`, animation:"popIn .15s ease both" }}>
-              <div style={{ fontSize:10, fontWeight:800, color:C.textDim, letterSpacing:1, textTransform:"uppercase", marginBottom:8, padding:"0 6px" }}>
-                SELECT BLOCK TYPE
-              </div>
-              {BLOCK_CATEGORIES.map(cat => (
-                <div key={cat.id}>
-                  <div className="btn"
-                    onClick={() => {
-                      if (cat.subs.length > 0) {
-                        setBlockSubMenu(blockSubMenu === cat.id ? null : cat.id);
-                        setShowCustomInput(false);
-                      } else if (cat.isCustom) {
-                        setShowCustomInput(!showCustomInput);
-                        setBlockSubMenu(null);
-                      } else {
-                        addBlock(cat.id);
-                      }
-                    }}
-                    style={{ display:"flex", alignItems:"center", gap:9, padding:"8px 10px", borderRadius:8,
-                      background: blockSubMenu===cat.id ? (dark?"rgba(255,255,255,0.04)":"rgba(0,0,0,0.03)") : "transparent",
-                      marginBottom:2 }}>
-                    <div style={{ width:28, height:28, borderRadius:7, background:cat.color+"25",
-                      border:`1px solid ${cat.color}50`, display:"flex", alignItems:"center",
-                      justifyContent:"center", flexShrink:0 }}>
-                      {(BLOCK_ICON_MAP[cat.icon] || BLOCK_ICON_MAP.custom)(cat.color, 14)}
-                    </div>
-                    <span style={{ fontSize:12, fontWeight:700, color:C.text, flex:1 }}>{cat.label}</span>
-                    {cat.subs.length > 0 && <ChevronRight size={13} color={C.textDim}/>}
-                  </div>
-                  {/* Sub-types */}
-                  {blockSubMenu === cat.id && cat.subs.length > 0 && (
-                    <div style={{ marginLeft:36, marginBottom:4 }}>
-                      {cat.subs.map(s => (
-                        <div key={s.id} className="btn" onClick={() => addBlock(s.id)}
-                          style={{ fontSize:12, fontWeight:600, color:C.textMid, padding:"6px 10px",
-                            borderRadius:6, marginBottom:2, cursor:"pointer",
-                            borderLeft:`2px solid ${cat.color}40` }}>
-                          {s.label}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {/* Custom block name input */}
-                  {cat.isCustom && showCustomInput && (
-                    <div style={{ marginLeft:36, marginBottom:4, display:"flex", gap:6 }}>
-                      <input value={customBlockName} onChange={e => setCustomBlockName(e.target.value)}
-                        onKeyDown={e => { if (e.key==="Enter" && customBlockName.trim()) addBlock("custom", customBlockName.trim()); }}
-                        placeholder="Block name..." autoFocus
-                        style={{ flex:1, fontSize:12, padding:"6px 10px", borderRadius:6,
-                          background:C.bgHover, border:`1px solid ${C.border}`, outline:"none",
-                          color:C.text, fontFamily:"'DM Sans',sans-serif" }}/>
-                      <div className="btn" onClick={() => { if (customBlockName.trim()) addBlock("custom", customBlockName.trim()); }}
-                        style={{ fontSize:12, fontWeight:700, padding:"6px 12px", borderRadius:6,
-                          background:GOLD, color:"#111" }}>Add</div>
-                    </div>
-                  )}
-                </div>
-              ))}
-              <div className="btn" onClick={() => { setShowBlockMenu(false); setBlockSubMenu(null); setShowCustomInput(false); }}
-                style={{ display:"flex", alignItems:"center", justifyContent:"center", padding:"6px",
-                  fontSize:11, color:C.textDim, marginTop:4 }}>
-                Cancel
-              </div>
+              {showDropZone(blocks.length) && <div style={{ width:"90%", height:3, borderRadius:2, background:GOLD }}/>}
             </div>
           )}
         </div>
@@ -1228,10 +1333,25 @@ function PracticePlansPage({ C, dark }) {
         <div style={{ width:300, borderLeft:`1px solid ${C.border}`, overflow:"hidden", flexShrink:0,
           animation:"slideInRight .2s ease both" }}>
           <DrillSearchPanel
+            key={`${activeBlockId}-${activePdpSlot || "main"}`}
             block={activeBlock}
             C={C} dark={dark}
-            onAddDrill={drill => addDrillToBlock(activeBlock.id, drill)}
-            onRemoveDrill={drill => removeDrillFromBlock(activeBlock.id, drill)}
+            pdpSlot={activePdpSlot}
+            pdpSlotLabel={activePdpSlot ? PDP_SLOT_META[activePdpSlot]?.filterLabel : null}
+            onAddDrill={drill => {
+              if (activePdpSlot && activeBlock.pdpSlots) {
+                setPdpSlotDrill(activeBlock.id, activePdpSlot, drill);
+              } else {
+                addDrillToBlock(activeBlock.id, drill);
+              }
+            }}
+            onRemoveDrill={drill => {
+              if (activePdpSlot && activeBlock.pdpSlots) {
+                clearPdpSlot(activeBlock.id, activePdpSlot);
+              } else {
+                removeDrillFromBlock(activeBlock.id, drill);
+              }
+            }}
           />
         </div>
       )}
