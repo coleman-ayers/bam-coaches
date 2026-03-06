@@ -1042,7 +1042,7 @@ function SearchBar({C}){
 }
 
 // ── POST CARD ──────────────────────────────────────────────────────────────
-function PostCard({p,C,dark,compact,onTagClick,activeTag,onProfileClick}){
+function PostCard({p,C,dark,compact,onTagClick,activeTag,onProfileClick,showLikeHint}){
   const [lk,setLk]=useState(false);
   const [la,setLa]=useState(false);
   const [open,setOpen]=useState(false);
@@ -1051,6 +1051,8 @@ function PostCard({p,C,dark,compact,onTagClick,activeTag,onProfileClick}){
   const [replies,setReplies]=useState(p.replies);
   const [memberOpen,setMemberOpen]=useState(false);
   const [lastTap,setLastTap]=useState(0);
+  const [hintVis,setHintVis]=useState(!!showLikeHint);
+  useEffect(()=>{if(showLikeHint){const t=setTimeout(()=>setHintVis(false),3000);return()=>clearTimeout(t);}},[showLikeHint]);
   const nameRef=useRef(null);
   const ac=getAC(p.author);
   const border=getCardBorder(p.id);
@@ -1144,6 +1146,7 @@ function PostCard({p,C,dark,compact,onTagClick,activeTag,onProfileClick}){
                 background:lk?(dark?"rgba(226,221,159,0.1)":"rgba(226,221,159,0.15)"):"transparent"}}>
               <Ic.Heart c={lk?GOLD:C.textDim} f={lk} s={15}/>{p.likes+(lk?1:0)}
             </span>
+            {hintVis&&<span style={{fontSize:11,color:C.textDim,opacity:0.5,fontStyle:"italic",marginLeft:2,transition:"opacity .5s"}}>double-click to like</span>}
             <span className="btn" onClick={e=>{e.stopPropagation();setOpen(v=>!v);}}
               style={{display:"flex",alignItems:"center",gap:6,fontSize:13,color:open?GOLD:C.textDim,
                 fontWeight:open?700:400,padding:"5px 10px",borderRadius:8,
@@ -3350,7 +3353,7 @@ function OnboardingFlow({onComplete,onTourStart}){
   return null;
 }
 
-function TourOverlay({onComplete}){
+function TourOverlay({onComplete,onNavigate}){
   const [tourStep,setTourStep]=useState(0);
   const tourData=OB_TOUR_STEPS[tourStep];
   const isLast=tourStep===OB_TOUR_STEPS.length-1;
@@ -3374,14 +3377,22 @@ function TourOverlay({onComplete}){
   if(tourData.type==="group"&&tourData.groupLabel==="Player Development") activeIds.push("_pd_header");
   if(tourData.type==="group"&&tourData.groupLabel==="Team Coaching") activeIds.push("_team_header");
 
+  // Navigate to the highlighted page
+  useEffect(()=>{
+    if(onNavigate) onNavigate(tourData.ids[0]);
+  },[tourStep,tourData.ids,onNavigate]);
+
   // Find the Y position of the first highlighted sidebar item for tooltip placement
   const firstHighlightIdx=TOUR_SIDEBAR.findIndex(item=>activeIds.includes(item.id));
   const tooltipTop=Math.max(120, 76 + firstHighlightIdx * 34);
 
   const finish=()=>{
     try{localStorage.setItem("onboardingComplete","true");}catch(e){}
+    if(onNavigate) onNavigate("dashboard");
     onComplete();
   };
+
+  const advance=()=>setTourStep(t=>t+1);
 
   return (
     <div style={{position:"fixed",inset:0,zIndex:10000,fontFamily:"'DM Sans',sans-serif",pointerEvents:"none"}}>
@@ -3418,31 +3429,29 @@ function TourOverlay({onComplete}){
           </div>
         </div>
       </div>
-      {/* Tooltip card */}
-      <div className="ob-fade" key={tourStep} style={{position:"absolute",left:260,top:tooltipTop,maxWidth:400,pointerEvents:"auto"}}>
-        {/* Arrow pointing left */}
-        <div style={{position:"absolute",left:-8,top:16,width:0,height:0,borderTop:"8px solid transparent",borderBottom:"8px solid transparent",borderRight:`8px solid rgba(36,36,36,0.95)`}}/>
-        <div style={{background:"rgba(36,36,36,0.95)",border:`1px solid ${GOLD}40`,borderRadius:14,padding:"28px 32px",backdropFilter:"blur(12px)"}}>
-          <div style={{fontSize:11,color:GOLD,letterSpacing:2,fontWeight:700,textTransform:"uppercase",marginBottom:6}}>PLATFORM TOUR</div>
-          <div style={{fontSize:22,fontWeight:700,color:GOLD,marginBottom:8}}>{tourData.label}</div>
-          <div style={{fontSize:14,color:"#B0A898",marginBottom:24,lineHeight:1.6}}>{tourData.desc}</div>
-          <div style={{display:"flex",alignItems:"center",gap:16}}>
+      {/* Tooltip anchored next to sidebar */}
+      <div className="ob-fade" key={tourStep} style={{position:"absolute",left:248,top:tooltipTop,width:280,pointerEvents:"auto"}}>
+        <div style={{position:"absolute",left:-6,top:14,width:0,height:0,borderTop:"6px solid transparent",borderBottom:"6px solid transparent",borderRight:`6px solid rgba(36,36,36,0.95)`}}/>
+        <div style={{background:"rgba(36,36,36,0.95)",border:`1px solid ${GOLD}40`,borderRadius:10,padding:"16px 20px",backdropFilter:"blur(12px)"}}>
+          <div style={{fontSize:16,fontWeight:700,color:GOLD,marginBottom:4}}>{tourData.label}</div>
+          <div style={{fontSize:13,color:"#B0A898",marginBottom:14,lineHeight:1.5}}>{tourData.desc}</div>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
             {isLast
               ?<button className="ob-btn" onClick={finish}
-                style={{padding:"12px 36px",borderRadius:10,fontSize:14,fontWeight:800,letterSpacing:1.5,
+                style={{padding:"8px 24px",borderRadius:8,fontSize:13,fontWeight:800,letterSpacing:1,
                   background:GOLD,color:"#111",border:"none",fontFamily:"'Bebas Neue',sans-serif",cursor:"pointer"}}>
                 DONE
               </button>
-              :<button className="ob-btn" onClick={()=>setTourStep(t=>t+1)}
-                style={{padding:"12px 32px",borderRadius:10,fontSize:14,fontWeight:700,
+              :<button className="ob-btn" onClick={advance}
+                style={{padding:"8px 20px",borderRadius:8,fontSize:13,fontWeight:700,
                   background:"transparent",color:GOLD,border:`1px solid ${GOLD}`,
                   fontFamily:"'DM Sans',sans-serif",cursor:"pointer"}}>
                 Next →
               </button>
             }
-            <div style={{display:"flex",gap:5}}>
+            <div style={{display:"flex",gap:4}}>
               {OB_TOUR_STEPS.map((_,i)=>(
-                <div key={i} style={{width:i===tourStep?20:6,height:4,borderRadius:2,
+                <div key={i} style={{width:i===tourStep?16:5,height:3,borderRadius:2,
                   background:i<=tourStep?GOLD:"#555",transition:"all .3s"}}/>
               ))}
             </div>
@@ -3734,7 +3743,7 @@ export default function BAMFull(){
       return ()=>clearTimeout(t);
     }
   },[dashIntro]);
-  const [nav,setNav]=useState("pd");
+  const [nav,setNav]=useState("dashboard");
   const [pageKey,setPageKey]=useState(0);
   const [notifOn,setNotifOn]=useState(true);
   const [notif,setNotif]=useState(null);
@@ -4055,7 +4064,7 @@ export default function BAMFull(){
                     <span style={{fontSize:12,color:C.green,fontWeight:700}}>Live</span>
                   </div>
                 </div>
-                {(activeTag==="All"?POSTS_DATA:POSTS_DATA.filter(p=>p.tag===activeTag)).map(p=><PostCard key={p.id} p={p} C={C} dark={dark} onTagClick={t=>setActiveTag(t)} activeTag={activeTag==="All"?null:activeTag} onProfileClick={setProfileName}/>)}
+                {(activeTag==="All"?POSTS_DATA:POSTS_DATA.filter(p=>p.tag===activeTag)).map((p,i)=><PostCard key={p.id} p={p} C={C} dark={dark} onTagClick={t=>setActiveTag(t)} activeTag={activeTag==="All"?null:activeTag} onProfileClick={setProfileName} showLikeHint={i===0}/>)}
               </div>
             </div>
           )}
@@ -4176,7 +4185,7 @@ export default function BAMFull(){
       {profileName&&<ProfilePanel key={profileName} name={profileName} dark={dark} C={C} onClose={()=>setProfileName(null)}/>}
       {myProfileOpen&&<MyProfilePanel C={C} dark={dark} onClose={()=>setMyProfileOpen(false)}/>}
       {mapOpen&&<MemberMapOverlay C={C} dark={dark} onClose={()=>setMapOpen(false)} onProfileClick={(name)=>{setProfileName(name);setMapOpen(false);}}/>}
-      {tourActive&&<TourOverlay onComplete={()=>setTourActive(false)}/>}
+      {tourActive&&<TourOverlay onComplete={()=>setTourActive(false)} onNavigate={setNav}/>}
       </div>
     </div>
   );
