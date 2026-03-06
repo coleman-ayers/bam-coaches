@@ -3397,7 +3397,7 @@ export default function BAMFull(){
         className="micro-pulse"
         style={{width:60,height:75,objectFit:"contain",filter:"drop-shadow(0 0 18px rgba(226,221,159,0.35))"}}
       />
-      <div style={{marginTop:28,fontSize:11,fontWeight:700,letterSpacing:3,color:"#ffffff",textTransform:"uppercase"}}>BAM Coaches</div>
+      <div style={{marginTop:28,fontSize:18,fontWeight:900,letterSpacing:4,color:GOLD,textTransform:"uppercase"}}>YOU'RE IN.</div>
     </div>
   );
 
