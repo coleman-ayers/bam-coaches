@@ -3234,11 +3234,8 @@ function OnboardingFlow({onComplete}){
     <div style={wrap}>
       <style>{ONBOARDING_CSS}</style>
       <div className="ob-fade" style={{textAlign:"center",padding:40}}>
-        <img src={BAM_LOGO_PNG} alt="BAM" style={{width:70,height:88,objectFit:"contain",marginBottom:16,
+        <img src={BAM_LOGO_PNG} alt="BAM" style={{width:70,height:88,objectFit:"contain",marginBottom:24,
           filter:"drop-shadow(0 0 24px rgba(226,221,159,0.35))"}}/>
-        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:72,color:GOLD,lineHeight:1,
-          letterSpacing:4,marginBottom:8,animation:"obGlow 3s ease-in-out infinite",
-          textShadow:"0 0 30px rgba(226,221,159,0.2)"}}>BAM</div>
         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:64,color:"#F5F0E8",lineHeight:1,
           letterSpacing:3,marginBottom:32}}>YOU'RE IN.</div>
         <div style={{fontSize:15,color:"#9A9488",lineHeight:1.8,maxWidth:480,margin:"0 auto 40px"}}>
