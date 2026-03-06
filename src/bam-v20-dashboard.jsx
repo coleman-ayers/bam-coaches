@@ -3997,6 +3997,7 @@ export default function BAMFull(){
   const [myProfileOpen,setMyProfileOpen]=useState(false);
   const [mapOpen,setMapOpen]=useState(false);
   const [callBanner,setCallBanner]=useState(null);
+  const [callsOpen,setCallsOpen]=useState(false);
   const [now,setNow]=useState(Date.now());
   const toggleFav=(item,sectionId)=>setFavDrills(prev=>{
     const key=`${sectionId}-${item.id}`;
@@ -4233,76 +4234,6 @@ export default function BAMFull(){
               <Globe dark={dark}/>
               <div style={{maxWidth:720,margin:"0 auto",position:"relative",zIndex:1}}>
 
-                {/* ── Next Call + Calendar ── */}
-                {(()=>{
-                  const calls=getAllUpcomingCalls();
-                  const next=calls[0];
-                  if(!next) return null;
-                  const nextDate=new Date(next.dateTime);
-                  const diff=next.dateTime-now;
-
-                  // Monthly calendar
-                  const calMonth=nextDate.getMonth();
-                  const calYear=nextDate.getFullYear();
-                  const firstDay=new Date(calYear,calMonth,1).getDay();
-                  const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
-                  const callDays=new Set(calls.filter(c=>{const d=new Date(c.dateTime);return d.getMonth()===calMonth&&d.getFullYear()===calYear;}).map(c=>new Date(c.dateTime).getDate()));
-                  const today=new Date();
-                  const todayDate=today.getMonth()===calMonth&&today.getFullYear()===calYear?today.getDate():-1;
-
-                  return (
-                    <div style={{marginBottom:24}}>
-                      {/* Next Call Card */}
-                      <div style={{background:`linear-gradient(135deg,${dark?"#2A2A1A":"#FDFCF0"},${dark?"#242424":"#FFF"})`,border:`1px solid ${GOLD}50`,borderRadius:14,padding:22,marginBottom:16,display:"flex",alignItems:"center",gap:18}}>
-                        <div style={{width:52,height:52,borderRadius:14,background:`${GOLD}18`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                          <Video size={24} color={GOLD}/>
-                        </div>
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:16,fontWeight:800,color:C.text,marginBottom:2}}>{next.title}</div>
-                          <div style={{fontSize:13,color:C.textMid}}>
-                            {nextDate.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})} at {nextDate.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})} EST
-                          </div>
-                          <div style={{fontSize:12,color:GOLD,fontWeight:700,marginTop:4}}>
-                            {diff>0?`Starts in ${fmtCountdown(diff)}`:"Happening now!"}
-                          </div>
-                        </div>
-                        <a href={next.meetLink} target="_blank" rel="noopener noreferrer"
-                          style={{display:"inline-flex",alignItems:"center",gap:6,background:GOLD,color:"#111",padding:"10px 20px",borderRadius:10,fontSize:13,fontWeight:700,textDecoration:"none",fontFamily:"'DM Sans',sans-serif",flexShrink:0}}>
-                          <Video size={14}/> Join Call
-                        </a>
-                      </div>
-
-                      {/* Monthly Calendar */}
-                      <div style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:14,padding:18}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
-                          <CalendarDays size={15} color={GOLD}/>
-                          <span style={{fontSize:14,fontWeight:700,color:C.text}}>
-                            {new Date(calYear,calMonth).toLocaleDateString("en-US",{month:"long",year:"numeric"})} — Upcoming Calls
-                          </span>
-                        </div>
-                        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,textAlign:"center"}}>
-                          {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>(
-                            <div key={d} style={{fontSize:10,color:C.textDim,fontWeight:700,padding:4}}>{d}</div>
-                          ))}
-                          {Array.from({length:firstDay}).map((_,i)=><div key={`e${i}`}/>)}
-                          {Array.from({length:daysInMonth}).map((_,i)=>{
-                            const day=i+1;
-                            const hasCall=callDays.has(day);
-                            const isToday=day===todayDate;
-                            return (
-                              <div key={day} style={{padding:"6px 0",fontSize:12,borderRadius:8,fontWeight:hasCall||isToday?700:400,
-                                color:hasCall?"#111":isToday?GOLD:C.textMid,
-                                background:hasCall?GOLD:isToday?`${GOLD}18`:"transparent"}}>
-                                {day}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-
                 <div className={focused||compose?"":"compose-pulse"} style={{background:C.bgCard,border:`1px solid ${focused?GOLD+"90":C.border}`,borderRadius:14,padding:22,marginBottom:24,transition:"border-color .25s,box-shadow .25s",boxShadow:focused?`0 0 0 4px rgba(226,221,159,0.14),0 4px 20px ${C.shadow}`:dark?"none":`0 2px 12px ${C.shadow}`}}>
                   <input ref={attachRef} type="file" multiple accept="image/*,video/*,.pdf" style={{display:"none"}} onChange={e=>{
                     const files=Array.from(e.target.files||[]);
@@ -4401,6 +4332,76 @@ export default function BAMFull(){
                     );
                   })}
                 </div>
+
+                {/* ── Group Calls Widget ── */}
+                {(()=>{
+                  const calls=getAllUpcomingCalls();
+                  const next=calls[0];
+                  if(!next) return null;
+                  const nextDate=new Date(next.dateTime);
+                  const diff=next.dateTime-now;
+                  const calMonth=nextDate.getMonth();
+                  const calYear=nextDate.getFullYear();
+                  const firstDay=new Date(calYear,calMonth,1).getDay();
+                  const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
+                  const callDays=new Set(calls.filter(c=>{const d=new Date(c.dateTime);return d.getMonth()===calMonth&&d.getFullYear()===calYear;}).map(c=>new Date(c.dateTime).getDate()));
+                  const today=new Date();
+                  const todayDate=today.getMonth()===calMonth&&today.getFullYear()===calYear?today.getDate():-1;
+                  return (
+                    <div style={{marginBottom:20}}>
+                      {/* Collapsed row */}
+                      <div onClick={()=>setCallsOpen(o=>!o)} style={{background:C.bgCard,border:`1px solid ${callsOpen?GOLD+"50":C.border}`,borderRadius:10,padding:"10px 16px",display:"flex",alignItems:"center",gap:10,cursor:"pointer",transition:"border-color .2s"}}>
+                        <CalendarDays size={14} color={GOLD}/>
+                        <span style={{fontSize:13,fontWeight:600,color:C.text,flex:1}}>Next Call: Monday 7PM EST</span>
+                        <span style={{fontSize:12,color:GOLD,fontWeight:700}}>{diff>0?fmtCountdown(diff):"Now"}</span>
+                        <ChevronDown size={14} color={C.textDim} style={{transform:callsOpen?"rotate(180deg)":"none",transition:"transform .2s"}}/>
+                      </div>
+                      {/* Expanded panel */}
+                      {callsOpen&&(
+                        <div style={{background:C.bgCard,border:`1px solid ${C.border}`,borderTop:"none",borderRadius:"0 0 10px 10px",padding:16,marginTop:-1}}>
+                          {/* Next call details + Join */}
+                          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14,padding:"10px 14px",background:`${GOLD}0A`,borderRadius:8,border:`1px solid ${GOLD}20`}}>
+                            <Video size={16} color={GOLD}/>
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontSize:13,fontWeight:700,color:C.text}}>{next.title}</div>
+                              <div style={{fontSize:11,color:C.textDim}}>
+                                {nextDate.toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"})} at {nextDate.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})} EST
+                              </div>
+                            </div>
+                            <a href={next.meetLink} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()}
+                              style={{display:"inline-flex",alignItems:"center",gap:5,background:GOLD,color:"#111",padding:"6px 14px",borderRadius:7,fontSize:12,fontWeight:700,textDecoration:"none",fontFamily:"'DM Sans',sans-serif",flexShrink:0}}>
+                              Join <Video size={11}/>
+                            </a>
+                          </div>
+                          {/* Mini calendar */}
+                          <div style={{fontSize:11,fontWeight:700,color:C.textDim,marginBottom:8,display:"flex",alignItems:"center",gap:6}}>
+                            <CalendarDays size={11} color={C.textDim}/>
+                            {new Date(calYear,calMonth).toLocaleDateString("en-US",{month:"long",year:"numeric"})}
+                          </div>
+                          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:1,textAlign:"center"}}>
+                            {["S","M","T","W","T","F","S"].map((d,i)=>(
+                              <div key={i} style={{fontSize:9,color:C.textDim,fontWeight:700,padding:2}}>{d}</div>
+                            ))}
+                            {Array.from({length:firstDay}).map((_,i)=><div key={`e${i}`}/>)}
+                            {Array.from({length:daysInMonth}).map((_,i)=>{
+                              const day=i+1;
+                              const hasCall=callDays.has(day);
+                              const isToday=day===todayDate;
+                              return (
+                                <div key={day} style={{padding:"4px 0",fontSize:11,borderRadius:6,fontWeight:hasCall||isToday?700:400,
+                                  color:hasCall?"#111":isToday?GOLD:C.textMid,
+                                  background:hasCall?GOLD:isToday?`${GOLD}18`:"transparent"}}>
+                                  {day}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:16}}>
                   <span style={{fontSize:18}}>📌</span>
                   <span style={{fontSize:18,fontWeight:800,color:C.text,letterSpacing:.5,textTransform:"uppercase"}}>New Posts</span>
