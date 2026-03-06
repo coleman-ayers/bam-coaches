@@ -3219,7 +3219,7 @@ function OnboardingFlow({onComplete}){
 
   const inputStyle={width:"100%",maxWidth:420,padding:"14px 18px",borderRadius:10,fontSize:14,
     fontFamily:"'DM Sans',sans-serif",background:"#1A1A1A",color:"#F5F0E8",
-    border:"1px solid #333",marginBottom:14};
+    border:"1px solid #333",marginBottom:14,boxSizing:"border-box"};
 
   const dropdownStyle={padding:"14px 18px",borderRadius:10,fontSize:14,
     fontFamily:"'DM Sans',sans-serif",background:"#1A1A1A",color:"#F5F0E8",
