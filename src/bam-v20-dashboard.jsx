@@ -3845,8 +3845,9 @@ function ResourcesPage({C, dark}){
     setLoadingSummary(null);
   };
 
+  const sectionColor = dark ? GOLD : "#1A1A1A";
   const sectionTitle = (text) => (
-    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:GOLD,letterSpacing:2,marginBottom:16,marginTop:36}}>{text}</div>
+    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:sectionColor,letterSpacing:2,marginBottom:16,marginTop:36}}>{text}</div>
   );
 
   return (
