@@ -307,20 +307,31 @@ const Ic = {
 };
 
 // ── CONTENT CARD ────────────────────────────────────────────────────────────
-function ContentCard({item, sectionId, C, dark, onClick, favDrills=[], toggleFav}){
+function ContentCard({item, sectionId, C, dark, onClick, favDrills=[], toggleFav, masterProgress}){
   const thumbColors = SECTION_COLORS[sectionId] || SECTION_COLORS.pd;
   const thumbColor = thumbColors[item.id % thumbColors.length];
-  const coachAC = getAC(item.coach);
   const isFav = favDrills.some(f=>f.key===`${sectionId}-${item.id}`);
+  const [thumbErr,setThumbErr]=useState(false);
+  const [vidLoading,setVidLoading]=useState(true);
+  // Prompt 4: NEW badge only for items added within 2 days
+  const isRecentlyNew = item.isNew && item.date_added && (Date.now()-new Date(item.date_added).getTime()<2*86400000);
+  const showNew = item.isNew && !item.date_added || isRecentlyNew; // fallback: show if no date_added field
+  // Prompt 8: masterclass progress bar
+  const mProg = sectionId==="master" && masterProgress ? masterProgress[`master-${item.id}`] : null;
   return (
     <div className="cc" onClick={()=>onClick(item)}
-      style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden",boxShadow:dark?"none":`0 2px 8px ${C.shadow}`,"--hs":`0 8px 28px ${C.shadow}`}}>
+      style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden",boxShadow:dark?"none":`0 2px 8px ${C.shadow}`,"--hs":`0 8px 28px ${C.shadow}`,position:"relative"}}>
       {/* Thumbnail */}
-      <div style={{height:130,background:thumbColor,position:"relative",display:"flex",alignItems:"center",justifyContent:"center"}}>
-        <div style={{width:44,height:44,borderRadius:"50%",background:"rgba(0,0,0,0.35)",display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)"}}>
-          <Play size={18} color="#fff" fill="#fff"/>
-        </div>
-        {item.isNew&&<div style={{position:"absolute",top:10,left:10,fontSize:9,fontWeight:800,color:"#1A1A1A",background:GOLD,padding:"3px 8px",borderRadius:4,letterSpacing:.8}}>NEW</div>}
+      <div style={{height:130,background:thumbErr?"#1A1A1A":thumbColor,position:"relative",display:"flex",alignItems:"center",justifyContent:"center",
+        border:thumbErr?`1px solid ${GOLD}30`:"none"}}>
+        {thumbErr?(
+          <img src={LOGO} alt="BAM" className="micro-pulse" style={{width:36,height:42,objectFit:"contain",opacity:.5,filter:`drop-shadow(0 0 8px ${GOLD}33)`}}/>
+        ):(
+          <div style={{width:44,height:44,borderRadius:"50%",background:"rgba(0,0,0,0.35)",display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)"}}>
+            <Play size={18} color="#fff" fill="#fff"/>
+          </div>
+        )}
+        {showNew&&<div style={{position:"absolute",top:10,left:10,fontSize:9,fontWeight:800,color:"#1A1A1A",background:GOLD,padding:"3px 8px",borderRadius:4,letterSpacing:.8}}>NEW</div>}
         <div onClick={e=>{e.stopPropagation();toggleFav&&toggleFav(item,sectionId);}}
           style={{position:"absolute",top:8,right:9,width:28,height:28,borderRadius:"50%",
             background:"rgba(0,0,0,0.45)",backdropFilter:"blur(4px)",
@@ -343,37 +354,84 @@ function ContentCard({item, sectionId, C, dark, onClick, favDrills=[], toggleFav
           <div style={{fontSize:9,fontWeight:700,color:"#111",background:GOLD,padding:"2px 8px",borderRadius:10,letterSpacing:.5}}>{item.tag}</div>
           <div style={{fontSize:10,color:C.textDim,fontWeight:500}}>{item.level}</div>
         </div>
-        <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:4,lineHeight:1.3}}>{item.title}</div>
+        <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:4,lineHeight:1.3,
+          display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{item.title}</div>
         <div style={{fontSize:12,color:C.textDim,marginBottom:10}}>{item.sub}</div>
-        <div style={{display:"flex",alignItems:"center",gap:7,paddingTop:9,borderTop:`1px solid ${C.border}`}}>
-          <div style={{width:8,height:8,borderRadius:"50%",background:GOLD,opacity:.7,flexShrink:0}}/>
-          <span style={{fontSize:11,color:C.textDim,fontWeight:500}}>BAM Coaches</span>
-        </div>
       </div>
+      {/* Prompt 8: masterclass progress bar */}
+      {mProg>0&&<div style={{position:"absolute",bottom:0,left:0,right:0,height:3,background:C.border}}>
+        <div style={{height:"100%",width:`${Math.min(mProg,100)}%`,background:GOLD,borderRadius:"0 2px 0 0",transition:"width .3s"}}/>
+      </div>}
     </div>
   );
 }
 
 // ── CONTENT DETAIL PANEL ───────────────────────────────────────────────────
-function ContentDetail({item, sectionId, C, dark, onClose}){
+function ContentDetail({item, sectionId, C, dark, onClose, masterProgress, setMasterProgress, onWorkoutLeave}){
   const thumbColors = SECTION_COLORS[sectionId] || SECTION_COLORS.pd;
   const thumbColor = thumbColors[item.id % thumbColors.length];
-  const coachAC = getAC(item.coach);
-  const [saved, setSaved] = useState(false);
+  // Prompt 4: persist saved/liked state in localStorage
+  const favKey = `bam_fav_${sectionId}_${item.id}`;
+  const [saved, setSaved] = useState(()=>{try{return localStorage.getItem(favKey)==="1";}catch{return false;}});
+  const toggleSaved=()=>{const nv=!saved;setSaved(nv);try{nv?localStorage.setItem(favKey,"1"):localStorage.removeItem(favKey);}catch{}};
+  // Prompt 8: masterclass progress
+  const mKey=`master-${item.id}`;
+  const mProg=sectionId==="master"&&masterProgress?masterProgress[mKey]||0:0;
+  const hasKeyPoints=item.keyPoints&&item.keyPoints.length>0;
+  // Prompt 7: workout in-progress state
+  const [workoutStarted,setWorkoutStarted]=useState(false);
+  const [showWorkoutLeave,setShowWorkoutLeave]=useState(false);
+  const handleClose=()=>{
+    if(sectionId==="workouts"&&workoutStarted){setShowWorkoutLeave(true);return;}
+    onClose();
+  };
+  // Mark masterclass as started when detail is opened
+  useEffect(()=>{
+    if(sectionId==="master"&&setMasterProgress&&mProg===0){
+      setMasterProgress(prev=>{const n={...prev,[mKey]:10};try{localStorage.setItem("bam_master_progress",JSON.stringify(n));}catch{}return n;});
+    }
+  },[]);// eslint-disable-line
   return (
     <div className="detail-panel" style={{width:340,flexShrink:0,background:C.bgCard,borderLeft:`1px solid ${C.border}`,display:"flex",flexDirection:"column",overflow:"auto"}}>
+      {/* Prompt 8: masterclass progress bar at top */}
+      {sectionId==="master"&&mProg>0&&(
+        <div style={{height:3,background:C.border,flexShrink:0}}>
+          <div style={{height:"100%",width:`${Math.min(mProg,100)}%`,background:GOLD,transition:"width .3s"}}/>
+        </div>
+      )}
       {/* Video thumb */}
       <div style={{height:180,background:thumbColor,position:"relative",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
         <div style={{width:54,height:54,borderRadius:"50%",background:"rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)"}}>
           <Play size={22} color="#fff" fill="#fff"/>
         </div>
-        <button onClick={onClose} style={{position:"absolute",top:12,right:12,width:28,height:28,borderRadius:"50%",background:"rgba(0,0,0,0.5)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)"}}>
+        <button onClick={handleClose} style={{position:"absolute",top:12,right:12,width:28,height:28,borderRadius:"50%",background:"rgba(0,0,0,0.5)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)"}}>
           <X size={13} color="#fff"/>
         </button>
-        {item.isNew&&<div style={{position:"absolute",top:12,left:12,fontSize:9,fontWeight:800,color:"#1A1A1A",background:GOLD,padding:"3px 8px",borderRadius:4,letterSpacing:.8}}>NEW</div>}
       </div>
 
+      {/* Prompt 7: Workout leave confirmation modal */}
+      {showWorkoutLeave&&(
+        <div onClick={e=>e.stopPropagation()} style={{position:"fixed",inset:0,zIndex:5000,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div style={{background:dark?"#1A1A1A":"#fff",borderRadius:14,padding:"28px 32px",maxWidth:360,textAlign:"center",border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:16,fontWeight:800,color:C.text,marginBottom:8}}>Leave this workout?</div>
+            <div style={{fontSize:13,color:C.textDim,marginBottom:22,lineHeight:1.6}}>Your progress will be reset.</div>
+            <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+              <button onClick={()=>setShowWorkoutLeave(false)} style={{padding:"8px 24px",borderRadius:8,fontSize:13,fontWeight:700,background:GOLD,color:"#111",border:"none",cursor:"pointer"}}>Stay</button>
+              <button onClick={()=>{setShowWorkoutLeave(false);setWorkoutStarted(false);onClose();}} style={{padding:"8px 24px",borderRadius:8,fontSize:13,fontWeight:700,background:"transparent",color:C.textMid,border:`1px solid ${C.border}`,cursor:"pointer"}}>Leave</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{padding:20,flex:1}}>
+        {/* Prompt 8: Continue where you left off */}
+        {sectionId==="master"&&mProg>0&&mProg<100&&(
+          <div className="btn" onClick={()=>{/* scroll to last section */}}
+            style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",background:`${GOLD}12`,border:`1px solid ${GOLD}30`,borderRadius:9,marginBottom:14,cursor:"pointer"}}>
+            <Play size={13} color={GOLD} fill={GOLD}/>
+            <span style={{fontSize:12,fontWeight:700,color:GOLD}}>Continue where you left off ({mProg}%)</span>
+          </div>
+        )}
         {/* Tags row */}
         <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:12}}>
           <div style={{fontSize:10,fontWeight:700,color:"#111",background:GOLD,padding:"3px 9px",borderRadius:10,letterSpacing:.4}}>{item.tag}</div>
@@ -387,33 +445,28 @@ function ContentDetail({item, sectionId, C, dark, onClose}){
         <div style={{fontSize:17,fontWeight:800,color:C.text,marginBottom:4,lineHeight:1.3}}>{item.title}</div>
         <div style={{fontSize:12,color:C.textDim,marginBottom:14}}>{item.sub}</div>
 
-        {/* Coach */}
-        <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:16,padding:"11px 13px",background:C.bgHover,borderRadius:9}}>
-          <img src={LOGO} alt="BAM" style={{width:22,height:26,objectFit:"contain",flexShrink:0,opacity:.85}}/>
-          <div>
-            <div style={{fontSize:13,fontWeight:700,color:C.text}}>BAM Coaches</div>
-            <div style={{fontSize:11,color:C.textDim}}>By Any Means</div>
-          </div>
-        </div>
-
         {/* Description */}
         <div style={{fontSize:13,color:C.textMid,lineHeight:1.7,marginBottom:16}}>{item.desc}</div>
 
-        {/* Key points */}
-        <div style={{fontSize:12,fontWeight:800,color:C.text,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>Key Points</div>
-        {item.keyPoints.map((pt,i)=>(
-          <div key={i} style={{display:"flex",gap:9,alignItems:"flex-start",marginBottom:8}}>
-            <CheckCircle size={13} color={GOLD} style={{flexShrink:0,marginTop:2}}/>
-            <div style={{fontSize:13,color:C.textMid,lineHeight:1.55}}>{pt}</div>
-          </div>
-        ))}
+        {/* Key points — Prompt 4: hide if empty */}
+        {hasKeyPoints&&(
+          <>
+            <div style={{fontSize:12,fontWeight:800,color:C.text,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>Key Points</div>
+            {item.keyPoints.map((pt,i)=>(
+              <div key={i} style={{display:"flex",gap:9,alignItems:"flex-start",marginBottom:8}}>
+                <CheckCircle size={13} color={GOLD} style={{flexShrink:0,marginTop:2}}/>
+                <div style={{fontSize:13,color:C.textMid,lineHeight:1.55}}>{pt}</div>
+              </div>
+            ))}
+          </>
+        )}
 
         {/* Actions */}
         <div style={{display:"flex",gap:9,marginTop:20}}>
-          <div className="btn" style={{flex:1,background:GOLD,color:"#111",fontWeight:800,fontSize:13,padding:"11px 0",borderRadius:9,textAlign:"center",boxShadow:`0 4px 14px ${GOLD}44`}}>
-            Watch Now
+          <div className="btn" onClick={()=>{if(sectionId==="workouts")setWorkoutStarted(true);}} style={{flex:1,background:GOLD,color:"#111",fontWeight:800,fontSize:13,padding:"11px 0",borderRadius:9,textAlign:"center",boxShadow:`0 4px 14px ${GOLD}44`}}>
+            {sectionId==="workouts"&&workoutStarted?"In Progress...":"Watch Now"}
           </div>
-          <div className="btn" onClick={()=>setSaved(v=>!v)} style={{width:42,height:42,borderRadius:9,border:`1px solid ${saved?GOLD:C.border}`,background:saved?C.goldDim:"transparent",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div className="btn" onClick={toggleSaved} style={{width:42,height:42,borderRadius:9,border:`1px solid ${saved?GOLD:C.border}`,background:saved?C.goldDim:"transparent",display:"flex",alignItems:"center",justifyContent:"center"}}>
             <Ic.Heart c={saved?GOLD:C.textDim} f={saved} s={17}/>
           </div>
           <div className="btn" style={{width:42,height:42,borderRadius:9,border:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -806,10 +859,20 @@ function PracticePlansPage({ C, dark }) {
   };
   const onDrillDragEnd = () => { setDrillDrag(null); setDrillDropTarget(null); };
 
-  // Save plan
+  const [namePromptVisible, setNamePromptVisible] = useState(false);
+  const planNameRef = useRef(null);
+
+  // Save plan — Prompt 6: validation
   const savePlan = () => {
     if (blocks.length === 0) return;
-    const name = planName.trim() || prompt("Plan name:") || "Untitled Plan";
+    if (!planName.trim()) {
+      setNamePromptVisible(true);
+      setEditingName(true);
+      setTimeout(()=>planNameRef.current?.focus(),50);
+      return;
+    }
+    setNamePromptVisible(false);
+    const name = planName.trim();
     const plan = {
       id: Date.now(),
       name,
@@ -1050,12 +1113,15 @@ function PracticePlansPage({ C, dark }) {
           display:"flex", alignItems:"center", gap:12, flexShrink:0, flexWrap:"wrap" }}>
           <FileText size={18} color={GOLD} strokeWidth={2}/>
           {editingName ? (
-            <input value={planName} onChange={e => setPlanName(e.target.value)}
-              onBlur={() => setEditingName(false)} onKeyDown={e => e.key==="Enter"&&setEditingName(false)}
-              autoFocus placeholder="Plan name..."
-              style={{ fontSize:16, fontWeight:800, color:C.text, background:"transparent",
-                border:`1px solid ${GOLD}`, borderRadius:6, padding:"4px 10px",
-                outline:"none", fontFamily:"'DM Sans',sans-serif", minWidth:160 }}/>
+            <div style={{position:"relative"}}>
+              <input ref={planNameRef} value={planName} onChange={e=>{setPlanName(e.target.value);if(e.target.value.trim())setNamePromptVisible(false);}}
+                onBlur={() => setEditingName(false)} onKeyDown={e => e.key==="Enter"&&setEditingName(false)}
+                autoFocus placeholder="Plan name..."
+                style={{ fontSize:16, fontWeight:800, color:C.text, background:"transparent",
+                  border:`1px solid ${namePromptVisible?"#E06060":GOLD}`, borderRadius:6, padding:"4px 10px",
+                  outline:"none", fontFamily:"'DM Sans',sans-serif", minWidth:160 }}/>
+              {namePromptVisible&&<div style={{position:"absolute",top:"100%",left:0,fontSize:11,color:"#E06060",fontWeight:600,marginTop:2,whiteSpace:"nowrap"}}>Please name your plan before saving</div>}
+            </div>
           ) : (
             <div className="btn" onClick={() => setEditingName(true)}
               style={{ fontSize:16, fontWeight:800, color:C.text }}>
@@ -1067,19 +1133,28 @@ function PracticePlansPage({ C, dark }) {
           </div>
           <div style={{ fontSize:12, color:C.textDim }}>{blocks.length} blocks</div>
           <div style={{ flex:1 }}/>
-          <div className="btn" onClick={exportPDF}
-            style={{ fontSize:12, fontWeight:700, color:C.textMid, padding:"7px 14px", borderRadius:7,
-              border:`1px solid ${C.border}`, display:"flex", alignItems:"center", gap:6,
-              opacity:blocks.length===0?0.4:1 }}>
-            <Download size={12} color={C.textDim}/> Export PDF
-          </div>
-          <div className="btn" onClick={savePlan}
-            style={{ fontSize:13, fontWeight:800, color:"#111", background:GOLD,
-              padding:"8px 18px", borderRadius:8, boxShadow:`0 4px 14px ${GOLD}44`,
-              display:"flex", alignItems:"center", gap:6,
-              opacity:blocks.length===0?0.4:1 }}>
-            <Save size={14} color="#111"/>
-            {saved ? "Saved" : "Save Plan"}
+          {/* Prompt 6: Export PDF only for saved plans with drills */}
+          {blocks.length>0&&blocks.some(b=>b.drills?.length>0||(b.pdpSlots&&Object.values(b.pdpSlots).some(s=>s)))&&saved&&(
+            <div className="btn" onClick={exportPDF}
+              style={{ fontSize:12, fontWeight:700, color:C.textMid, padding:"7px 14px", borderRadius:7,
+                border:`1px solid ${C.border}`, display:"flex", alignItems:"center", gap:6 }}>
+              <Download size={12} color={C.textDim}/> Export PDF
+            </div>
+          )}
+          {/* Prompt 6: Save button with tooltip */}
+          <div style={{position:"relative"}}>
+            <div className="btn" onClick={savePlan}
+              style={{ fontSize:13, fontWeight:800, color:blocks.length===0?"#666":"#111", background:blocks.length===0?(dark?"#333":"#ddd"):GOLD,
+                padding:"8px 18px", borderRadius:8, boxShadow:blocks.length===0?"none":`0 4px 14px ${GOLD}44`,
+                display:"flex", alignItems:"center", gap:6,
+                cursor:blocks.length===0?"not-allowed":"pointer",
+                pointerEvents:blocks.length===0?"none":"auto" }}>
+              <Save size={14} color={blocks.length===0?"#666":"#111"}/>
+              {saved ? "Saved" : "Save Plan"}
+            </div>
+            {blocks.length===0&&(
+              <div style={{position:"absolute",top:"100%",right:0,fontSize:10,color:C.textDim,marginTop:4,whiteSpace:"nowrap",fontStyle:"italic"}}>Add at least one block to save</div>
+            )}
           </div>
         </div>
 
@@ -1362,16 +1437,96 @@ function PracticePlansPage({ C, dark }) {
 
 // ── CONTENT PAGE ────────────────────────────────────────────────────────────
 function ContentPage({sectionId, C, dark, favDrills=[], toggleFav}){
-  const [activeFilter, setActiveFilter] = useState("All");
+  const [activeFilters, setActiveFilters] = useState(["All"]);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [searchQ, setSearchQ] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [recentSearches, setRecentSearches] = useState(()=>{try{return JSON.parse(localStorage.getItem("bam_recent_searches")||"[]");}catch{return[];}});
+  const scrollContainerRef = useRef(null);
+  const searchInputRef = useRef(null);
+  // Prompt 8: masterclass progress
+  const [masterProgress, setMasterProgress] = useState(()=>{try{return JSON.parse(localStorage.getItem("bam_master_progress")||"{}");}catch{return{};}});
+
   if (sectionId === "plans") return <PracticePlansPage C={C} dark={dark}/>;
   const section = CONTENT[sectionId];
   const navItem = NAV.find(n=>n.id===sectionId);
-  const filtered = activeFilter==="All" ? section.items : section.items.filter(i=>i.tag===activeFilter);
+
+  // Prompt 1: save search to recents
+  const commitSearch=(term)=>{
+    const t=term.trim();
+    if(!t) return;
+    const updated=[t,...recentSearches.filter(s=>s!==t)].slice(0,5);
+    setRecentSearches(updated);
+    try{localStorage.setItem("bam_recent_searches",JSON.stringify(updated));}catch{}
+    setSearchFocused(false);
+  };
+
+  // Prompt 2: filter stacking — group filters by classification
+  const filterGroups = {};
+  section.filters.filter(f=>f!=="All").forEach(f=>{
+    // Classify by matching item properties
+    const matchesLevel = section.items.some(i=>i.level===f);
+    const group = matchesLevel ? "level" : "tag";
+    if(!filterGroups[group]) filterGroups[group]={label:group==="level"?"Level":"Category",filters:[]};
+    filterGroups[group].filters.push(f);
+  });
+
+  const toggleFilter=(f)=>{
+    if(f==="All"){setActiveFilters(["All"]);return;}
+    setActiveFilters(prev=>{
+      const without=prev.filter(x=>x!=="All"&&x!==f);
+      const has=prev.includes(f);
+      if(has){return without.length===0?["All"]:without;}
+      return [...without,f];
+    });
+  };
+
+  // Prompt 2: AND between groups, OR within groups
+  const activeNonAll = activeFilters.filter(f=>f!=="All");
+  const activeLevelFilters = activeNonAll.filter(f=>section.items.some(i=>i.level===f));
+  const activeTagFilters = activeNonAll.filter(f=>section.items.some(i=>i.tag===f)&&!section.items.some(i=>i.level===f));
+
+  let filtered = section.items;
+  if(activeNonAll.length>0){
+    filtered = filtered.filter(item=>{
+      const passLevel = activeLevelFilters.length===0 || activeLevelFilters.includes(item.level);
+      const passTag = activeTagFilters.length===0 || activeTagFilters.includes(item.tag);
+      return passLevel && passTag;
+    });
+  }
+
+  // Prompt 1: search filtering
+  const trimQ = searchQ.trim().toLowerCase();
+  const isSearching = trimQ.length > 0;
+  if(isSearching){
+    filtered = filtered.filter(item=>
+      item.title.toLowerCase().includes(trimQ)||
+      item.sub.toLowerCase().includes(trimQ)||
+      item.tag.toLowerCase().includes(trimQ)||
+      item.desc.toLowerCase().includes(trimQ)
+    );
+  }
+
+  // Prompt 5: scroll position memory
+  const scrollKey = `bam_scroll_${sectionId}`;
+  const openDetail=(item)=>{
+    if(scrollContainerRef.current){
+      try{sessionStorage.setItem(scrollKey,""+scrollContainerRef.current.scrollTop);}catch{}
+    }
+    setSelectedItem(item);
+  };
+  const closeDetail=()=>{
+    setSelectedItem(null);
+    setTimeout(()=>{
+      if(scrollContainerRef.current){
+        try{const pos=parseInt(sessionStorage.getItem(scrollKey)||"0",10);scrollContainerRef.current.scrollTop=pos;}catch{}
+      }
+    },0);
+  };
 
   return (
     <div style={{display:"flex",flex:1,overflow:"hidden",height:"100%"}}>
-      <div style={{flex:1,overflow:"auto",padding:28}}>
+      <div ref={scrollContainerRef} style={{flex:1,overflow:"auto",padding:28}}>
         {/* Header */}
         <div style={{marginBottom:24}}>
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
@@ -1381,18 +1536,66 @@ function ContentPage({sectionId, C, dark, favDrills=[], toggleFav}){
           <div style={{fontSize:14,color:C.textDim}}>{section.desc}</div>
         </div>
 
-        {/* Filters */}
-        <div style={{display:"flex",gap:8,marginBottom:24,flexWrap:"wrap"}}>
-          {section.filters.map(f=>(
-            <div key={f} className="tag-pill" onClick={()=>setActiveFilter(f)}
-              style={{fontSize:12,fontWeight:700,padding:"6px 16px",borderRadius:20,border:`1px solid ${activeFilter===f?GOLD:C.border}`,background:activeFilter===f?GOLD:"transparent",color:activeFilter===f?"#111":C.textMid,transition:"all .15s"}}>
-              {f}
+        {/* Prompt 1: Search bar */}
+        <div style={{position:"relative",marginBottom:18}}>
+          <div style={{display:"flex",alignItems:"center",gap:9,background:C.bgHover,border:`1px solid ${searchFocused?GOLD+"60":C.border}`,borderRadius:10,padding:"8px 14px",transition:"border-color .2s"}}>
+            <Ic.Search c={GOLD} s={14}/>
+            <input ref={searchInputRef} value={searchQ}
+              onChange={e=>setSearchQ(e.target.value)}
+              onFocus={()=>setSearchFocused(true)}
+              onBlur={()=>setTimeout(()=>setSearchFocused(false),200)}
+              onKeyDown={e=>{if(e.key==="Enter"&&searchQ.trim())commitSearch(searchQ);}}
+              placeholder="Search content..."
+              style={{flex:1,background:"transparent",border:"none",outline:"none",fontSize:13,color:C.text,fontFamily:"'DM Sans',sans-serif"}}/>
+            {searchQ&&<span className="btn" onClick={()=>{setSearchQ("");setSearchFocused(false);}} style={{color:C.textDim,fontSize:14,lineHeight:1}}>×</span>}
+          </div>
+          {/* Prompt 1: Recent searches dropdown */}
+          {searchFocused&&!searchQ&&recentSearches.length>0&&(
+            <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:20,marginTop:4,background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:10,padding:"8px 0",boxShadow:dark?"0 8px 24px rgba(0,0,0,0.5)":`0 8px 24px ${C.shadow}`}}>
+              <div style={{fontSize:10,fontWeight:700,color:C.textDim,padding:"4px 14px",letterSpacing:.8,textTransform:"uppercase"}}>Recent Searches</div>
+              {recentSearches.map((s,i)=>(
+                <div key={i} className="btn" onMouseDown={e=>{e.preventDefault();setSearchQ(s);commitSearch(s);}}
+                  style={{padding:"7px 14px",fontSize:13,color:C.textMid,cursor:"pointer",display:"flex",alignItems:"center",gap:8}}>
+                  <Clock size={11} color={C.textDim}/>{s}
+                </div>
+              ))}
             </div>
-          ))}
+          )}
+        </div>
+
+        {/* Filters — Prompt 2: grouped */}
+        <div style={{marginBottom:18}}>
+          <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+            <div className="tag-pill" onClick={()=>toggleFilter("All")}
+              style={{fontSize:12,fontWeight:700,padding:"6px 16px",borderRadius:20,border:`1px solid ${activeFilters.includes("All")?GOLD:C.border}`,background:activeFilters.includes("All")?GOLD:"transparent",color:activeFilters.includes("All")?"#111":C.textMid,transition:"all .15s"}}>
+              All
+            </div>
+            {Object.entries(filterGroups).map(([gKey,g])=>(
+              <div key={gKey} style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                <span style={{fontSize:9,fontWeight:700,color:C.textDim,textTransform:"uppercase",letterSpacing:.8,marginRight:2}}>{g.label}:</span>
+                {g.filters.map(f=>(
+                  <div key={f} className="tag-pill" onClick={()=>toggleFilter(f)}
+                    style={{fontSize:12,fontWeight:700,padding:"6px 16px",borderRadius:20,border:`1px solid ${activeFilters.includes(f)?GOLD:C.border}`,background:activeFilters.includes(f)?GOLD:"transparent",color:activeFilters.includes(f)?"#111":C.textMid,transition:"all .15s"}}>
+                    {f}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+          {/* Active filter summary */}
+          {activeNonAll.length>0&&(
+            <div style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:C.textMid,marginBottom:4}}>
+              <span style={{fontWeight:700}}>Showing:</span>
+              {activeLevelFilters.length>0&&<span>{activeLevelFilters.join(" or ")}</span>}
+              {activeLevelFilters.length>0&&activeTagFilters.length>0&&<span>·</span>}
+              {activeTagFilters.length>0&&<span>{activeTagFilters.join(" or ")}</span>}
+              <span className="btn" onClick={()=>setActiveFilters(["All"])} style={{color:C.textDim,fontSize:13,marginLeft:4,cursor:"pointer"}}>×</span>
+            </div>
+          )}
         </div>
 
         {/* New badge row */}
-        {filtered.some(i=>i.isNew)&&(
+        {!isSearching&&filtered.some(i=>i.isNew)&&(
           <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:16}}>
             <span style={{fontSize:16}}>⚡</span>
             <span style={{fontSize:15,fontWeight:800,color:C.text,textTransform:"uppercase",letterSpacing:.5}}>New This Week</span>
@@ -1403,11 +1606,33 @@ function ContentPage({sectionId, C, dark, favDrills=[], toggleFav}){
         {/* Grid */}
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:16}}>
           {filtered.map(item=>(
-            <ContentCard key={item.id} item={item} sectionId={sectionId} C={C} dark={dark} onClick={setSelectedItem} favDrills={favDrills} toggleFav={toggleFav}/>
+            <ContentCard key={item.id} item={item} sectionId={sectionId} C={C} dark={dark} onClick={openDetail} favDrills={favDrills} toggleFav={toggleFav} masterProgress={masterProgress}/>
           ))}
         </div>
 
-        {filtered.length===0&&(
+        {/* Prompt 1: empty states */}
+        {filtered.length===0&&isSearching&&(
+          <div style={{textAlign:"center",padding:"60px 0",color:C.textDim}}>
+            <img src={LOGO} alt="BAM" className="micro-pulse" style={{width:48,height:56,objectFit:"contain",margin:"0 auto 16px",display:"block",opacity:.45,filter:`drop-shadow(0 0 12px ${GOLD}33)`}}/>
+            <div style={{fontSize:15,fontWeight:600,marginBottom:20}}>Nothing found — search again with a different idea!</div>
+            <div style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:12,padding:"18px 20px",maxWidth:420,margin:"0 auto",textAlign:"left"}}>
+              <div style={{fontSize:11,fontWeight:800,color:GOLD,letterSpacing:.8,textTransform:"uppercase",marginBottom:10}}>AI Suggestions</div>
+              <div style={{fontSize:13,color:C.textMid,lineHeight:1.7}}>
+                {trimQ.includes("finish")&&<div style={{marginBottom:6}}>Try: "1v1 Live Finishing" — a constraint drill for creative finishing</div>}
+                {trimQ.includes("shoot")&&<div style={{marginBottom:6}}>Try: "Catch & Shoot Progression" — systematic shooting series</div>}
+                {!trimQ.includes("finish")&&!trimQ.includes("shoot")&&(
+                  <>
+                    <div style={{marginBottom:6}}>Try searching for a specific skill like "finishing" or "handles"</div>
+                    <div style={{marginBottom:6}}>Or browse by filter tags above</div>
+                    <div>Try broader terms like "drill", "game", or "decision"</div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {filtered.length===0&&!isSearching&&(
           <div style={{textAlign:"center",padding:"60px 0",color:C.textDim}}>
             <Filter size={32} color={C.textDim} style={{marginBottom:12,opacity:.4}}/>
             <div style={{fontSize:15,fontWeight:600}}>No content with this filter yet.</div>
@@ -1417,7 +1642,7 @@ function ContentPage({sectionId, C, dark, favDrills=[], toggleFav}){
 
       {/* Detail panel */}
       {selectedItem&&(
-        <ContentDetail item={selectedItem} sectionId={sectionId} C={C} dark={dark} onClose={()=>setSelectedItem(null)}/>
+        <ContentDetail item={selectedItem} sectionId={sectionId} C={C} dark={dark} onClose={closeDetail} masterProgress={masterProgress} setMasterProgress={setMasterProgress}/>
       )}
     </div>
   );
@@ -2724,6 +2949,17 @@ function PlaybookBuilder({ C, dark }) {
   const [showIg, setShowIg]         = useState(false);
   const [showX, setShowX]           = useState(false);
   const animFrameRef = useRef(null);
+  // Prompt 9: walkthrough
+  const [walkStep, setWalkStep] = useState(()=>{try{return localStorage.getItem("bam_pb_walkthrough_done")==="1"?-1:0;}catch{return 0;}});
+  const [showHelp, setShowHelp] = useState(false);
+  const WALK_STEPS=[
+    {title:"Place Players",desc:"Click 'Player' to add offensive players to the court. Drag them to position.",highlight:"add-player"},
+    {title:"Add Defenders",desc:"Press D or click to add defensive players (shown in red). Position them against offense.",highlight:"add-player"},
+    {title:"Draw Arrows",desc:"Select the arrow tool to draw movement paths and passing lanes between players.",highlight:"canvas"},
+    {title:"Use Screens",desc:"Add screens to create picks and off-ball actions. Rotate them with the toolbar.",highlight:"add-player"},
+  ];
+  const dismissWalkthrough=()=>{setWalkStep(-1);try{localStorage.setItem("bam_pb_walkthrough_done","1");}catch{};};
+  const reopenWalkthrough=()=>{setWalkStep(0);setShowHelp(false);};
 
   const createBook = () => {
     if (!newBookName.trim()) return;
@@ -3189,9 +3425,9 @@ function PlaybookBuilder({ C, dark }) {
                   }}
                 />
 
-                <div style={{marginTop:9,display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
-                  <span style={{fontSize:11,color:C.textDim}}>
-                    <b style={{color:C.textMid}}>Stage {stageIdx+1}:</b> Position players/ball, then draw arrows & screens for this stage. Each stage resets drawings.
+                <div style={{marginTop:12,display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
+                  <span style={{fontSize:13,color:C.textDim,lineHeight:1.5}}>
+                    <b style={{color:C.textMid,fontSize:14}}>Stage {stageIdx+1}:</b> Position players and ball, then draw arrows and screens for this stage. Each stage resets drawings.
                   </span>
                   {totalStages>=2&&(
                     <span style={{fontSize:11,color:GOLD,marginLeft:"auto"}}>
@@ -3202,6 +3438,42 @@ function PlaybookBuilder({ C, dark }) {
               </div>
             )}
           </div>
+        </div>
+      )}
+      {/* Prompt 9: Walkthrough popup */}
+      {view==="editor"&&walkStep>=0&&walkStep<WALK_STEPS.length&&(
+        <div style={{position:"fixed",inset:0,zIndex:4500,background:"rgba(0,0,0,0.55)",display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(2px)"}}>
+          <div style={{background:dark?"#1A1A1A":"#fff",borderRadius:16,padding:"28px 32px",maxWidth:400,textAlign:"center",border:`1px solid ${GOLD}40`,boxShadow:`0 20px 60px rgba(0,0,0,0.5)`}}>
+            <div style={{fontSize:10,fontWeight:700,color:C.textDim,letterSpacing:1,textTransform:"uppercase",marginBottom:12}}>Step {walkStep+1} of {WALK_STEPS.length}</div>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:28,color:GOLD,letterSpacing:1.5,marginBottom:8}}>{WALK_STEPS[walkStep].title}</div>
+            <div style={{fontSize:14,color:C.textMid,lineHeight:1.7,marginBottom:24}}>{WALK_STEPS[walkStep].desc}</div>
+            <div style={{display:"flex",gap:6,justifyContent:"center"}}>
+              {/* Progress dots */}
+              {WALK_STEPS.map((_,i)=>(
+                <div key={i} style={{width:8,height:8,borderRadius:"50%",background:i===walkStep?GOLD:(dark?"#333":"#ddd"),transition:"background .2s"}}/>
+              ))}
+            </div>
+            <div style={{marginTop:20}}>
+              {walkStep<WALK_STEPS.length-1?(
+                <button onClick={()=>setWalkStep(w=>w+1)}
+                  style={{padding:"10px 32px",borderRadius:9,fontSize:14,fontWeight:800,background:GOLD,color:"#111",border:"none",cursor:"pointer",letterSpacing:.5,fontFamily:"'Bebas Neue',sans-serif"}}>
+                  NEXT
+                </button>
+              ):(
+                <button onClick={dismissWalkthrough}
+                  style={{padding:"10px 32px",borderRadius:9,fontSize:14,fontWeight:800,background:GOLD,color:"#111",border:"none",cursor:"pointer",letterSpacing:.5,fontFamily:"'Bebas Neue',sans-serif"}}>
+                  GOT IT, LET'S BUILD
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Prompt 9: Help button */}
+      {view==="editor"&&walkStep===-1&&(
+        <div className="btn" onClick={reopenWalkthrough}
+          style={{position:"fixed",bottom:24,right:24,width:36,height:36,borderRadius:"50%",background:GOLD,color:"#111",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:800,boxShadow:`0 4px 14px ${GOLD}44`,zIndex:100,cursor:"pointer"}}>
+          ?
         </div>
       )}
     </div>
