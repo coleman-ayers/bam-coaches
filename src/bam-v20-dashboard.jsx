@@ -2042,247 +2042,37 @@ const PUBLIC_PLAYBOOKS = [
 ];
 
 
-// Pre-load microscope image — redraws court when loaded
-let MICRO_LOADED = false;
-const MICRO_IMG = new Image();
-MICRO_IMG.onload = () => { MICRO_LOADED = true; };
-MICRO_IMG.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABkCAYAAAAR+rcWAAABCGlDQ1BJQ0MgUHJvZmlsZQAAeJxjYGA8wQAELAYMDLl5JUVB7k4KEZFRCuwPGBiBEAwSk4sLGHADoKpv1yBqL+viUYcLcKakFicD6Q9ArFIEtBxopAiQLZIOYWuA2EkQtg2IXV5SUAJkB4DYRSFBzkB2CpCtkY7ETkJiJxcUgdT3ANk2uTmlyQh3M/Ck5oUGA2kOIJZhKGYIYnBncAL5H6IkfxEDg8VXBgbmCQixpJkMDNtbGRgkbiHEVBYwMPC3MDBsO48QQ4RJQWJRIliIBYiZ0tIYGD4tZ2DgjWRgEL7AwMAVDQsIHG5TALvNnSEfCNMZchhSgSKeDHkMyQx6QJYRgwGDIYMZAKbWPz9HbOBQAAAWAElEQVR4nO1deXAcV5n/vve6p+c+dNixk9iWZMmS7YAh3iRgr6NhCQkhkEBiZZcKBAoWF9eyhIIARTFSZXfJJpBAdpOQyi4FpJaFUU4n5MBJZtZxYUKcBHzKkm05ku3YkTT33f3et3/0jCzLh2ZGt+FXpRppuvv166+/993fE8BfAIgIEQGIgny25zLvQURIFGCzPY95gUAgwIgIe3p21J048sz2w4ee+VTpWCgUUgAAJ3uP8/pNtLcDQ0SysIEf+DyFK5zW1C+PDTy5uacn1Or3+w0AoGBwcst60m9groIoyBE7xMGeLevdrsgruVxal0Iyj8fBs3lMGeT+12ef//CPNm1C3ZSNGyUiUqX3OS85kIiws3MPEREqSuR+hAJICQwZ47FERggj4/Q40j/42Icf397ft6UdsUMgIlWjZM5LDixxX3/fU3fUeHPfi0aTOuNMBSodBwIg4XBoihAKGGR/MJlp+X5ra+twScEgdsly7nVeciB07qFgkDhDWgbAwWZTVZJSlA4jAiKikkrlZS6XIrc990WPfdcbhw8+ewtil0TskuUqmfOSAwFKth/Sgf3PfcJhS/+bzSpWxGJJYoyd9sxEZGgWrlhtDsjlLE/H457bV1zSvq+c+5xvHDhKHFOmBdjyFR9+vOdg69pU2nmf0+kAABKnXYSo5PKC4vG4sGqZj3o8J17rP/j0dwd+P2ALBAIMzsFo5xsBiQhwrBzr7f2J5vevTuXzaQ/ngHQWPcsYIiLj8URGFAopx+IF4l/lgh2Pd3Z2AlHgvCcgEhEGiBgikCnDAgpRSGlp+Vq+d9+zNy2oV25NJtMCEU/RtERSEMGowkBEjoB6IpEDAssvEVFC96qzEvC8kIEnbb5Hf+pyWhpHkjVfbWtbvx8A4M033/TWe3t3KTx3YT4vCHEs0xC4XC4wjAJkMjkBwBiRlDU1bj4S4b9oaLnxMxQMcuzoOG3ZlzDvOXCswexyiU0WNXWVz3H09cH+p+8I7San13X4Do+bXZTPG2Ic8QiZBSJx522ZrLK9ttbHGQO0WRVIJOiI5Gu+RhRgsHHjOc2ZeU1AIkIAgB1EqqJGHmRQgFg8qxtG2uFx5b7XaA3u4pDcFIslCRGV0nVSSuH1ONEwHI80tVx776HBmzdE47avM8UedbpqeDbv/nxTU1McYBVO5J3M6yUcCgUUv7/LOLDvye8tXGDcEYnEDURUiIAIpLRqKtd1AVICYPFJiYBUlRGBloimGttWDWWGoT0sEbvkrl0vNWlK/sqWtmt/VjKDJprDvCUgETHGUO7du22F13Hkz1JkFMMAhnjymYhAAgLimOeUUor6eh8/PqTe1tTysXtLIqD0WRy7LOIBACgTnzJX0Y1ECBo/9oBVk1oiQQIRT2GIU2UeAAAIp9PKTwyJ7U0tN95L9JAKsNEwz+0QpvmzChHxrEpjPOYlB5a45cD+Z29dUJv5eTRqLt2JrwOpWTgC2ntSGfdXlrde/bL5ffkcNx7zTolQIMAA9lBv7xv1Vi35w3Q6JRGxrOdABJbLG8BYts3tjL50tP/pu0MhsppeC1XFTPOOA0vcd2j/o4/U1YpbIpGkYIxVFIYyDWeJPp8bE0m+J6NfeE1z8+VHAUwXsJKx5hUHlojXu/eFD3nc8pZYrHLiAZRkI8p8Pi+EFFIIIw6dnVUx07whIBFhdzfAwMCATbNG7xciR0SnR1bKHY4xACINCvmaz7S1rU/CqoltvjNh3hAwHO7kHR0dQs++9v0aD1+ezeriDFq2LEgppdfr5smM8kDzyg++QXRud+1cmBcyMBgM8o6ODnGwZ+u7HI5jrxt6BoUEhlXMnwikpjHUDdvbBVq7srHxl0mATjqvtfDGjeYSVtTjD1oUoQhBUA3xTEiyWZ2YKzhvK9ddOxfmPAFDoYBiat3ffrHGy96fSGZPC0mVC0kkPG4Hj8TohebWj/xmrPdRLeb0EjY9g04aHPzTYoX69gBlXLoucay7Vv5YQIoCknGHHk0tendb24Y+AEJELCt5dDbMaQ4Mh83EuMgf+InDLj2FgkHVEM8ECbfbxZMZ9c6VKzf0hsMBPlniAcxhDiwtr76+566vc6eeTCYTBsDE7tqZxwJpt6mYyam9hwYvX9M+9JoOG6tLpI/HnORA063aQ/v2DbmsSvK+Qj5DROW5a2cCIoGi2tAQtV/x+xtysLFyj+NsmJMEDIc7OWKXtCrb/sXrxiW506LJ5YOIhMvlYCMx+bOmFVe9SLuDlskqjrGYcwQMBoPc7+8yDu1/+XK7rfCVWCxRtdYFAGAIWCigrmlL/gcAAFd3FIgAaZJFRSXMKRloLt1uFg5vxMYlwT86bfp7Uun8pAhYGlpVrTlgtueF8Nx/0bIPvGTeL8AAOmEyymSuEZAjoji0f/M36+sKd0UiMQORTUnQFxHA6bSBYSAUDEtISvfdFzd88DnzvtVXZ80ZAhIRA0Aa6P1jg8Xav4tkRtMNYtWbLWe6BUkAQJfTyiQooBe057OiprOxccOr5gmVG9ZzSAZ2IyKQwLfut1mlvaBLmELiAQAgInJEZMlUTqRTSWnVMtfYlGO/Pzb4zH/u3bu3tpQbISr/vnOCgKO53X2//WStD69JJDIGY5OWe2eFSUjGEsmsKORT6LJlvlzj2vd6f9+LNyB2CMaAijUxE2LWCRgohugHBnbXaNbUPdlsWlKZIfrJokhIjESTBlBqqccVfeLI4c0//sefktrV1SXLKf+ddRk4GqLve+y/6n3icyORRFVR5snPAySCpJpaD48nla3R5OKbV6++/PhEcnFWCXjSXdvS7nVEQ9lMUgBM39Itb06kez12NVfQ+kYSddetXLmh91xEnLUlXMqCEZFFY9EHgPJAhLO+IhBRjcYyhsIzzTWud0I9O0OtiB3ibMt51ggYDoeLdcxPf6fGy9oymYJRrbs21WAMlVQqbyg8t9jrHXnu8N4dizo6Son3cefOxITM7qCTb5CImN/vN/r7t7fZbdnvxOOJWV+644GISiqdN6xWfRnTDj+xezdZAFbh+PzxTGk7KpVOmAZzNwIgoDjyoKYKzRBUtc1HRARAQCTJLJYkAwCMYtHkpCIuDFGJxzN6rQ8ut6mP32XKwe5TaDatMqf0tvbs2ePweOKXXXzxupdLx/p6fvv5hXXZh8styzjL+KAoHABU4JyBZuWgMAAhBeTzOuTzOhCBUayZqZrDEcmw2lxKIlmzoWnFB18Zq1SmlQPNsBSS3XLgtgXe6EtvDzz52IED4eYdPT11DlvqrnQ6JaHKByMAabFwElIbRt58WcZYeEU0br85lXV9N5XSug1h3c+YlXw+t2K3W7jJoacXmJcDKQEZFIDhyI+DQeIAe0Y5e9o4sOTb9vdsa7E7j/7J0JOq2+Xk0biRYEx7y6LmLslmC8RYdZqXiAyf16MMj1g/3dh63SPjj4eIlKbB7W2MolehzN7Iuf5+qwYQi6cJkVGlCotICo/Hw6MJxycall/7RCgUUvx+vzGt5W2IQP19x+7XLNKay6GIxNJCVZhbVeUlmYxeNfGkJOH12pVIjJ5tbL3ukR07HlIvPeST4fo92N7eDgBDhIgGAOwq/txz+PDWdSIX+brDgTcKkcdczpCMVeLxIEhZICT5zwDwRHt7WJrfTgNGW616N3/W487+LJVKjeYzzDYrqJgDTo4NpCpIwOzpnLjokoaGdQMAARzfmmUGBAjD4TBrb/cLRFOh9Pe/dK2Vxx6wqLmlyVRWMKzE6yHiilXk5dLVjY3r9xMRmw4ZiJ2deygU6rcyVrjdZuNABCSl2aFhtllNRvZK4XK7WDpn/25j47q3zOza6X1tZrsDSr/fbyACEREjCvKGhr97Nppa+r58wfqmy2HjUlLZwVQiEC6nRUGKXGt+E666OGeCGxECAB44EG60W+J3Omz6jblsGvIFUbXGLY4rXC4bTyTVbcuab9pA1M0qjd/t2PGQunbtJn3btm2LGy8+tgMhc4GuS4IyFCoRCY/HzqMx9lRDy803EAX5tGhh0+5D2dzsP3Dh0htuSqQ9nwR0DPp8ToVMXqw4hG4mxhEKOs+TrP8CABLAxortvLVrN+k7djykrl+//lgqa/+WzWZHIlnmOIiFgg6MUVswSByxQ0yrGRMIBBgFN/IlDR/632PDTZemMo6H7Q4Xs9kUVjR4KwAJt9vN0xntjoYV7ftCoZBSbS7j0ks3GUSEBw59pDsWN45omsoBynqpaBgCAIwLli79oxdghqIxYw3Pgf4t16g8fo/TIduikQRJQppIGxKRcLttPJ5SdvU3bnxvO3RTtTmM8XN660B3t8ctbkokMgZMUHRPBMQYoCTVkPry5oa29x2eIVeuQ5T84SUNVz1/IrLub+Ip+10WzSldTo0RkVHUzmecNOcM8wWeAH7B37dDB4XD9ZOqqDJRjwAAnPFBxhjQ2boQT3kQAAACxgB9ixwMYAbbHIoPXOzHWJQGgNv7+195gmD43hqfdkU8ngQh6bQUJqJJQCHZSDYrOWK3AOiesnlJIBsQlbcWqTghCRCLZQhgFsJZJW4MhQJKQ8Pf/uGf/nDD+lja8W1VdabdbhuXUgo6lR1YPm8Ah0yDz3H8jYH+Z+7cu/f/FpkcPRkRZBrCRKLFEAKgzLEYQ5AE+dQJzALMUqNNkRuNorsnEeHfe3u3Pu2i6D0+n+XqdDoJhYIYDe0zhpgvGERUYEuXuW8/PJDiiPhNsy3fX6EyGu0LkQcPHvQQ/WFNLqcDwMReSWk16AaLDvguiwLMclIJESUiUCgUUlpaNuxdtPT6axJp5xcYcwz7fE5+Si8vIlk1Cxw9mjgqMzU/JAJsb2+vKjgQDoc5ESCH/Vd53ZYaXTdEOeE0AiKLqgAwtf/aFsxPquJpKuH3+w0zVhhgFy+75uFkftl70xn7r90uD9c0XjR5SFrtDpY1XN9oetf7TgAEWbWKZGhoiBCBQCS/RFKHso0RAlJUFUiwP5tfhPmc6ZUruWOhUEBpbr5sEAD+YfDwy49aON7tdusNnCFE4rC5ufkjvymW/Va8dAHGNuq8tMHhGPYnkllZfu0NoZQAhNatAADh8BzIC4+H399llEyei5d94LGD8da16Yz14UzWMswsTV8yl25ntcVApUQWMj5yN2M6QJlR66I5xeOJQianX/AKAEA4HJazngU7F8Ya4Lt3775g9erVxyc3XkhB9Bt9+5/66sJa/b5IJFZ2DpqIhNtlY8mUsmXJ8o6riQIMsUvOOQ4ci5MGeICtXr36eLUNgQBm3SGi39i5M9TqsuXuTKWSArH8aBQRAeMqGmD7FQBAONzOAKZhCZsPPHU/5qido7usnfv8ACtteTd+Ths3AuzeTRavY+hXqqLb9QqKl4iANIvCYonCEOGiJwEAShbAlC3hUnHkVJbPThZEQR4O16PL1Ytr127S+3sf+3ldjbg1Ek1WFFYjIqOmxq0MR5S7G5o//q1SOB9gigxpImLFyIg4cYKc2oK4CvE4AHimYviy8M47hxQpk04hFGm3r4w3NNTExr7M/oObv13nLdwaiVRKPCBFYSyeMNKp3NL/ML2f8Ml9ZiY78ZKg37z5qP3SNX/6rsKznzHyBaskQrMulMbcpvT72E8Y9zuMO/9Mf4+9BotHiEsp7AyZQMaTjPEjjGk7cwXLUwRU53GkHspkkkJKrKhos8R9Q8P8x40rPvH18XUykyJgadeM3t7we1y2yC9cdnlJIpk8lWYzBCIAkmZQgDEGqspBs1hANwCEkJDPZUjS+F0VJhyTLBZGQmqx4fiStiee+N0wAEBX18kUwiTC60GO2GH09f3uao9t+FHGcs7hkZyBFSVppgdCSNB1SZmsLhFKQQesIgcohdPpVo4Pq4E1a9a9c6YqrWorAhgiip6eLes99thTQk9pmYIUjE1NQfgUAQGAQXHfk0pBRMLltCnDEfHam3++8cEi8U4z4Ct+YHN7zU549dVXa53aW78Gyml5XYrpLMmdaRABKRyhoCu6ZAs/19GBwowcne61VGEHdrOuri65oPbtb/s8eGEmUzDY5Ps45hQQyfB4PTyZtn6nqal9l8l9Z86/VMSBxTia2LZvn4vRG59KJHRhhsMnSMggAJTtRWDxIWanelZKMmpqnOpwBJ5qbrv+RxMFLipcwt0MAMSFyltra2utC9MpA2zW4t6uZ0tqAACYBWin/H36KVQ8zyShISSUk6aYSkhJ0uO2KckU6xW45tZiJ5MA6DrrNdUJfWQ2Ie27DGFIMoAbQqgSpMKQAUNeFNo0uiOQMAxVklQQGSArliWc3AwMEYGklKqUpKBZukAAhpczyWaKiEREFpVj3lCPJHN117e2NsWLynK6dm8bKz4FXhkA/uVVQPX1gNB+6pk7n+vj1sEEX7RoESxeDACwGGARwKIx5wwOvqokk0nVal0oa2sLDS7b/u0gc5ZJxA8qAhEJj9vOR2LsuaYVN19bbtfSnAxnHT64+fM1nvzD0WhiUqUglYAIiDNAYFo+lb+orbX1yv5SyOpc101VNAYBAM0NYAFLGbNTPyf+CYUCijlY/kYh9NK4MwJEQCHJ8LgtmlWJ3mR+2z5xomm6J1YuSvJy587tC72Ogwc4KzgNAyaxR0I1cwBpt1tYKqPs/Pnym9/Tae5KcU4ZOGcCquFwmAMAeO2xD7jdmtMwZFmZsqkEIrBMJi/tNnjXLT0vXIGIE/4TlzlDwPb2IQIAkJC+AUkQIpthI2YU0qYhcCX1OSgjX3LWN2y6LuEZIfDrr/fipZe20KFDSxycth/QVKOuUJAzunxLKJbRoZRaLK23NK9YcSja3Q3QcZa9tU7TcGZkubO0Ic2k91WpBG8dfPEyt0urSyRyYraiOoiAhiGNGp/q1UeOfRax426As3e1n0LAQCBQiixTf/+2NSrG1+m6rgFIkHL6+tiQEyOBEiBynTAKAFXFT6YUPJlKk0UT3zhyaMtAInfhi4grRwBMGo2NB45OtHRg69at9cuXxu5DTN/ssCvjIsrTBfMeuVwOstkCVBT1nK4ZFZt4HHY7ZPN4XIL9v3sPLr3T71+dGmsfIoBJvM5OgP37P1rj1A6HfR5aNTQcI0Q2wwkiZHOl4RBgtI1MqgrnHq8L4gnc+U607oY1a67sp0CAYVeXLGXqGSLKQ/uDTy+sx+uGRuIFhswy2w8wV1D8Dzi6z+uwxBJs78Dbl1yxbsuv09DZSTi61UjvCx/yeRIvJBLxKdtq5HwDkSzU1/ssJ4ZYV0PzxzuJQgorVXsixL+EaMzUdgXzFExJpdKSYfbTweBuC2N+gyF2iN7eXjdj+vpMJo9E1Xc1/gUA83mDAYiLV62KLyIqeiIanahDkD4hZtTsm38YLTJHbGysPVkbU2w0mS3XaV4ilzM//yrwJokx2hbJVNc4rkj+rxiFuef+KZs3jiEgMcYApaS54AjMSRAQMgQgoNGVqwAA5ADABqqQ0jQaJ9d/cR4DgSQRIlNFrigEFQCAt1fIwdpdF7ZqGgDkAUCbxUnOB2QAWhrePTjb0zgv8P9gUhmMrk+oswAAAABJRU5ErkJggg==";
+// Pre-load court background image
+let COURT_BG_LOADED = false;
+const COURT_BG_IMG = new Image();
+COURT_BG_IMG.onload = () => { COURT_BG_LOADED = true; };
+COURT_BG_IMG.src = "/images/court-reference.png";
 
 function drawCourt(ctx, w, h, dark, igHandle, xHandle) {
-  // ── Floor ──────────────────────────────────────────────────────────────────
-  if (dark) {
-    const g = ctx.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0,   "#363636");
-    g.addColorStop(0.4, "#2C2C2C");
-    g.addColorStop(0.6, "#2C2C2C");
-    g.addColorStop(1,   "#363636");
-    ctx.fillStyle = g;
-  } else {
-    const g = ctx.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0,   "#EDD9A3");
-    g.addColorStop(0.35,"#E5CC8A");
-    g.addColorStop(0.65,"#E5CC8A");
-    g.addColorStop(1,   "#EDD9A3");
-    ctx.fillStyle = g;
-  }
+  // Fill background color (visible through transparent areas of court image)
+  ctx.fillStyle = dark ? "#2A2A2A" : "#E5CC8A";
   ctx.fillRect(0, 0, w, h);
 
-  // ── Wood grain planks ──────────────────────────────────────────────────────
-  ctx.save();
-  ctx.lineWidth = 1;
-  for (let y = 5; y < h; y += 8) {
-    ctx.strokeStyle = dark ? "rgba(255,255,255,0.025)" : "rgba(0,0,0,0.055)";
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-  }
-  for (let y = 0; y < h; y += 40) {
-    ctx.strokeStyle = dark ? "rgba(0,0,0,0.2)" : "rgba(0,0,0,0.08)";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-  }
-  ctx.restore();
-
-  // ── Setup ─────────────────────────────────────────────────────────────────
-  const line = dark ? "rgba(226,221,159,0.9)" : "rgba(15,15,15,0.9)";
-  const p  = 18;
-  const cx = w / 2;
-  const cy = h / 2;
-  const sx = (w - p*2) / 94;  // px per foot, horizontal
-  const sy = (h - p*2) / 50;  // px per foot, vertical
-
-  ctx.strokeStyle = line;
-  ctx.lineWidth   = 1.8;
-  ctx.lineCap     = "butt";
-
-  // ── Outer boundary ────────────────────────────────────────────────────────
-  ctx.strokeRect(p, p, w - p*2, h - p*2);
-
-  // ── Half-court line ───────────────────────────────────────────────────────
-  ctx.beginPath(); ctx.moveTo(cx, p); ctx.lineTo(cx, h - p); ctx.stroke();
-
-  // ── Center circle (outer 6ft radius) ──────────────────────────────────────
-  const ccR = 6 * sy;
-  ctx.beginPath(); ctx.arc(cx, cy, ccR, 0, Math.PI*2); ctx.stroke();
-  // Inner tip-off circle (2ft radius)
-  ctx.beginPath(); ctx.arc(cx, cy, 2 * sy, 0, Math.PI*2); ctx.stroke();
-
-  // ── Reusable dimensions ────────────────────────────────────────────────────
-  const keyD  = 19 * sx;      // key depth (baseline to FT line)
-  const keyW  = 16 * sy;      // key width (lane width)
-  const ftR   = 6  * sy;      // FT circle radius
-  const raR   = 4  * sy;      // restricted area radius
-  const bkD   = 5.25 * sx;    // basket depth from baseline
-  const bbW   = 6  * sy;      // backboard half-width (3ft each side)
-  const threeR = 23.75 * sx;  // 3pt arc radius
-  const cDist  = 22  * sy;    // 3pt corner distance from basket center
-
-  // Lane space marks — 4 marks on each side of the key, measured from baseline
-  // NBA: marks at 7ft, 8ft, 11ft, 14ft from baseline (1ft wide each)
-  const laneMarks = [7, 8, 11, 14];
-  const laneMarkW = 1 * sx;   // mark width (1ft)
-  const laneTickLen = 6;       // tick length in pixels
-
-  const drawHalf = (left) => {
-    const sign = left ? 1 : -1;
-    const base = left ? p : w - p;           // baseline x
-    const bx   = left ? p + bkD : w - p - bkD; // basket x
-    const kx   = left ? p : w - p - keyD;    // key left edge x
-
-    // ── Key / Paint box ────────────────────────────────────────────────────
-    ctx.strokeRect(kx, cy - keyW/2, keyD, keyW);
-
-    // ── Lane space marks (hash marks on key sides) ─────────────────────────
-    ctx.lineWidth = 1.5;
-    laneMarks.forEach(ft => {
-      const mx = left ? p + ft * sx : w - p - ft * sx;
-      const mx2 = left ? mx + laneMarkW : mx - laneMarkW;
-      // Top side
-      ctx.beginPath(); ctx.moveTo(mx, cy - keyW/2 - laneTickLen); ctx.lineTo(mx, cy - keyW/2); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(mx2, cy - keyW/2 - laneTickLen); ctx.lineTo(mx2, cy - keyW/2); ctx.stroke();
-      // Bottom side
-      ctx.beginPath(); ctx.moveTo(mx, cy + keyW/2); ctx.lineTo(mx, cy + keyW/2 + laneTickLen); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(mx2, cy + keyW/2); ctx.lineTo(mx2, cy + keyW/2 + laneTickLen); ctx.stroke();
-    });
-
-    // ── Dashed lane lines inside paint ─────────────────────────────────────
-    // Two dashed lines running from baseline to FT line, 2ft inside each lane edge
-    ctx.save();
-    ctx.setLineDash([6, 5]);
-    ctx.lineWidth = 1.2;
-    const innerLaneOffset = 2 * sy; // 2ft inward from lane edge
-    const laneStartX = left ? p : w - p;
-    const laneEndX = left ? p + keyD : w - p - keyD;
-    // Top inner dashed line
-    ctx.beginPath();
-    ctx.moveTo(laneStartX, cy - keyW/2 + innerLaneOffset);
-    ctx.lineTo(laneEndX, cy - keyW/2 + innerLaneOffset);
-    ctx.stroke();
-    // Bottom inner dashed line
-    ctx.beginPath();
-    ctx.moveTo(laneStartX, cy + keyW/2 - innerLaneOffset);
-    ctx.lineTo(laneEndX, cy + keyW/2 - innerLaneOffset);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.restore();
-    ctx.lineWidth = 1.8;
-
-    // ── FT circle: solid inside key, dashed outside ───────────────────────
-    const ftCx = left ? p + keyD : w - p - keyD;
-    // Solid half (inside key, toward baseline)
-    ctx.beginPath();
-    if (left) ctx.arc(ftCx, cy, ftR, Math.PI/2, Math.PI*1.5);
-    else       ctx.arc(ftCx, cy, ftR, -Math.PI/2, Math.PI/2);
-    ctx.stroke();
-    // Dashed half (outside key, toward mid-court)
-    ctx.save();
-    ctx.setLineDash([7, 5]);
-    ctx.beginPath();
-    if (left) ctx.arc(ftCx, cy, ftR, -Math.PI/2, Math.PI/2);
-    else       ctx.arc(ftCx, cy, ftR, Math.PI/2, Math.PI*1.5);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.restore();
-
-    // ── Restricted area arc ───────────────────────────────────────────────
-    ctx.beginPath();
-    if (left) {
-      ctx.arc(bx, cy, raR, Math.PI/2, Math.PI*1.5);
-      // Connect arc ends to baseline with straight lines
-      ctx.moveTo(bx, cy - raR); ctx.lineTo(base, cy - raR);
-      ctx.moveTo(bx, cy + raR); ctx.lineTo(base, cy + raR);
-    } else {
-      ctx.arc(bx, cy, raR, -Math.PI/2, Math.PI/2);
-      ctx.moveTo(bx, cy - raR); ctx.lineTo(base, cy - raR);
-      ctx.moveTo(bx, cy + raR); ctx.lineTo(base, cy + raR);
-    }
-    ctx.stroke();
-
-    // ── Backboard + rim ───────────────────────────────────────────────────
-    ctx.lineWidth = 3;
-    const bbX = left ? p + 4 * sx : w - p - 4 * sx;
-    ctx.beginPath();
-    ctx.moveTo(bbX, cy - bbW/2);
-    ctx.lineTo(bbX, cy + bbW/2);
-    ctx.stroke();
-    ctx.lineWidth = 1.8;
-
-    // Rim circle (9in radius = 0.75ft)
-    const rimX = left ? p + bkD : w - p - bkD;
-    ctx.beginPath();
-    ctx.arc(rimX, cy, 0.75 * sy, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // ── 3-point line ──────────────────────────────────────────────────────
-    const arcJoinX = bx + sign * Math.sqrt(threeR*threeR - cDist*cDist);
-
-    // Corner straight sections
-    ctx.beginPath();
-    ctx.moveTo(base, cy - cDist);
-    ctx.lineTo(arcJoinX, cy - cDist);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(base, cy + cDist);
-    ctx.lineTo(arcJoinX, cy + cDist);
-    ctx.stroke();
-
-    // Arc
-    const topAngle = Math.atan2(-cDist, arcJoinX - bx);
-    const botAngle = Math.atan2(+cDist, arcJoinX - bx);
-    ctx.beginPath();
-    ctx.arc(bx, cy, threeR, topAngle, botAngle, left);
-    ctx.stroke();
-
-    // ── Corner baseline marks ──────────────────────────────────────────────
-    // Small tick marks where 3pt line meets the baseline
-    ctx.lineWidth = 1.5;
-    const cornerTickLen = 4;
-    // Top corner
-    ctx.beginPath();
-    ctx.moveTo(base, cy - cDist - cornerTickLen);
-    ctx.lineTo(base, cy - cDist + cornerTickLen);
-    ctx.stroke();
-    // Bottom corner
-    ctx.beginPath();
-    ctx.moveTo(base, cy + cDist - cornerTickLen);
-    ctx.lineTo(base, cy + cDist + cornerTickLen);
-    ctx.stroke();
-    ctx.lineWidth = 1.8;
-  };
-
-  drawHalf(true);
-  drawHalf(false);
-
-  // ── Center logo ────────────────────────────────────────────────────────────
-  ctx.save();
-  ctx.translate(cx, cy);
-
-  // Subtle circle fill behind logo
-  ctx.beginPath(); ctx.arc(0, 0, ccR * 0.82, 0, Math.PI*2);
-  ctx.fillStyle = dark ? "rgba(0,0,0,0.35)" : "rgba(0,0,0,0.10)";
-  ctx.fill();
-
-  // Draw pre-loaded microscope image centered in the circle
-  if (MICRO_LOADED || MICRO_IMG.complete) {
-    const ms = ccR * 1.4;
-    ctx.drawImage(MICRO_IMG, -ms / 2, -ms / 2, ms, ms);
+  // Draw court reference image on top
+  if (COURT_BG_LOADED || COURT_BG_IMG.complete) {
+    ctx.drawImage(COURT_BG_IMG, 0, 0, w, h);
   }
 
-  ctx.restore();
-
-  // ── Social handles ─────────────────────────────────────────────────────────
+  // Social handles
   if (igHandle || xHandle) {
     ctx.save();
     ctx.font = "600 9.5px monospace";
     ctx.fillStyle = dark ? "rgba(226,221,159,0.5)" : "rgba(0,0,0,0.45)";
     ctx.textBaseline = "bottom";
-    let tx = p + 6;
+    let tx = 24;
     if (igHandle) {
       ctx.textAlign = "left";
-      ctx.fillText("IG @" + igHandle, tx, h - p - 5);
+      ctx.fillText("IG @" + igHandle, tx, h - 23);
       tx += ctx.measureText("IG @" + igHandle).width + 12;
     }
     if (xHandle) {
       ctx.textAlign = "left";
-      ctx.fillText("X @" + xHandle, tx, h - p - 5);
+      ctx.fillText("X @" + xHandle, tx, h - 23);
     }
     ctx.restore();
   }
@@ -2385,9 +2175,9 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
 
   useEffect(() => {
     redrawCourt();
-    if (!MICRO_LOADED) {
-      const prev = MICRO_IMG.onload;
-      MICRO_IMG.onload = () => { MICRO_LOADED = true; redrawCourt(); if(prev) prev(); };
+    if (!COURT_BG_LOADED) {
+      const prev = COURT_BG_IMG.onload;
+      COURT_BG_IMG.onload = () => { COURT_BG_LOADED = true; redrawCourt(); if(prev) prev(); };
     }
   }, [redrawCourt]);
 
