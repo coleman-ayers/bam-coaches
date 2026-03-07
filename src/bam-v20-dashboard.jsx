@@ -2082,11 +2082,28 @@ function drawCourt(ctx, w, h, dark, igHandle, xHandle) {
 // Draw a single player circle
 function drawPlayer(ctx, obj, selected, dark) {
   ctx.save();
-  if (selected) { ctx.shadowColor=GOLD; ctx.shadowBlur=12; }
-  ctx.beginPath(); ctx.arc(obj.x,obj.y,14,0,Math.PI*2);
-  ctx.fillStyle = obj.color||"#fff"; ctx.fill();
+  const r = 14;
+  // Drop shadow
+  ctx.beginPath(); ctx.arc(obj.x+1.5, obj.y+2.5, r, 0, Math.PI*2);
+  ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.fill();
+  // Selection glow
+  if (selected) { ctx.shadowColor=GOLD; ctx.shadowBlur=14; }
+  // Main circle
+  const baseColor = obj.color||"#fff";
+  ctx.beginPath(); ctx.arc(obj.x, obj.y, r, 0, Math.PI*2);
+  ctx.fillStyle = baseColor; ctx.fill();
+  // 3D rim / edge gradient
+  ctx.shadowColor="transparent"; ctx.shadowBlur=0;
+  const rim = ctx.createRadialGradient(obj.x-3, obj.y-3, r*0.3, obj.x, obj.y, r);
+  rim.addColorStop(0, "rgba(255,255,255,0.25)");
+  rim.addColorStop(0.7, "rgba(255,255,255,0)");
+  rim.addColorStop(1, "rgba(0,0,0,0.18)");
+  ctx.beginPath(); ctx.arc(obj.x, obj.y, r, 0, Math.PI*2);
+  ctx.fillStyle = rim; ctx.fill();
+  // Border
   ctx.strokeStyle = dark?"#111":"#333"; ctx.lineWidth=2; ctx.stroke();
-  const textCol = (obj.color==="#FFFFFF"||obj.color==="#fff"||obj.color===GOLD) ? "#111" : "#fff";
+  // Label
+  const textCol = (baseColor==="#FFFFFF"||baseColor==="#fff"||baseColor===GOLD) ? "#111" : "#fff";
   ctx.fillStyle=textCol; ctx.font="bold 11px sans-serif";
   ctx.textAlign="center"; ctx.textBaseline="middle";
   ctx.fillText(obj.label||"?", obj.x, obj.y);
@@ -2095,14 +2112,33 @@ function drawPlayer(ctx, obj, selected, dark) {
 
 function drawBall(ctx, x, y, selected) {
   ctx.save();
-  if (selected) { ctx.shadowColor="#E8762A"; ctx.shadowBlur=12; }
-  ctx.beginPath(); ctx.arc(x,y,10,0,Math.PI*2);
-  ctx.fillStyle="#E8762A"; ctx.fill();
-  ctx.strokeStyle="#8B3A00"; ctx.lineWidth=1.5; ctx.stroke();
-  ctx.strokeStyle="rgba(0,0,0,0.35)"; ctx.lineWidth=1;
-  ctx.beginPath(); ctx.arc(x,y,10,0.4,Math.PI-0.4); ctx.stroke();
-  ctx.beginPath(); ctx.arc(x,y,10,Math.PI+0.4,-0.4); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x,y-10); ctx.lineTo(x,y+10); ctx.stroke();
+  const r = 10;
+  // Drop shadow
+  ctx.beginPath(); ctx.arc(x+1, y+2, r, 0, Math.PI*2);
+  ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fill();
+  // Selection glow
+  if (selected) { ctx.shadowColor="#E8762A"; ctx.shadowBlur=14; }
+  // Main orange fill
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2);
+  const ballGrad = ctx.createRadialGradient(x-3, y-3, 1, x, y, r);
+  ballGrad.addColorStop(0, "#F5983A");
+  ballGrad.addColorStop(0.6, "#E8762A");
+  ballGrad.addColorStop(1, "#C45A18");
+  ctx.fillStyle = ballGrad; ctx.fill();
+  ctx.strokeStyle="#8B3A00"; ctx.lineWidth=1.2; ctx.stroke();
+  // Seam lines
+  ctx.shadowColor="transparent"; ctx.shadowBlur=0;
+  ctx.strokeStyle="rgba(30,10,0,0.5)"; ctx.lineWidth=1;
+  // Vertical seam
+  ctx.beginPath(); ctx.moveTo(x, y-r); ctx.lineTo(x, y+r); ctx.stroke();
+  // Horizontal seam (full)
+  ctx.beginPath(); ctx.moveTo(x-r, y); ctx.lineTo(x+r, y); ctx.stroke();
+  // Curved seams (left and right arcs)
+  ctx.beginPath(); ctx.arc(x, y, r*0.65, -Math.PI*0.42, Math.PI*0.42); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x, y, r*0.65, Math.PI-Math.PI*0.42, Math.PI+Math.PI*0.42); ctx.stroke();
+  // Highlight
+  ctx.beginPath(); ctx.arc(x-3, y-3, r*0.45, 0, Math.PI*2);
+  ctx.fillStyle="rgba(255,255,255,0.22)"; ctx.fill();
   ctx.restore();
 }
 
@@ -2124,11 +2160,30 @@ function drawArrowPath(ctx, pts, col, dashed) {
   ctx.restore();
 }
 
-function drawScreen(ctx, x, y, col, rot) {
+function drawScreen(ctx, x, y, col, rot, selected) {
   ctx.save();
-  ctx.translate(x,y); ctx.rotate((rot||0)*Math.PI/180);
-  ctx.strokeStyle=col; ctx.lineWidth=4; ctx.lineCap="square";
-  ctx.strokeRect(-15,-7,30,14);
+  ctx.translate(x, y); ctx.rotate((rot||0)*Math.PI/180);
+  const sw=30, sh=10;
+  // Drop shadow
+  ctx.fillStyle="rgba(0,0,0,0.3)";
+  ctx.beginPath();
+  ctx.roundRect(-sw/2+2, -sh/2+3, sw, sh, 3);
+  ctx.fill();
+  // Selection glow
+  if (selected) { ctx.shadowColor=GOLD; ctx.shadowBlur=12; }
+  // Main body
+  ctx.beginPath();
+  ctx.roundRect(-sw/2, -sh/2, sw, sh, 3);
+  ctx.fillStyle = col; ctx.fill();
+  // 3D top bevel
+  ctx.shadowColor="transparent"; ctx.shadowBlur=0;
+  ctx.beginPath();
+  ctx.roundRect(-sw/2, -sh/2, sw, sh*0.45, [3,3,0,0]);
+  ctx.fillStyle="rgba(255,255,255,0.2)"; ctx.fill();
+  // Border
+  ctx.beginPath();
+  ctx.roundRect(-sw/2, -sh/2, sw, sh, 3);
+  ctx.strokeStyle="rgba(0,0,0,0.35)"; ctx.lineWidth=1.2; ctx.stroke();
   ctx.restore();
 }
 
@@ -2193,7 +2248,7 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
     drawings.forEach(obj => {
       if (obj.type==="arrow") drawArrowPath(ctx, obj.points, obj.color, false);
       else if (obj.type==="dribble") drawArrowPath(ctx, obj.points, obj.color, true);
-      else if (obj.type==="screen") drawScreen(ctx, obj.x, obj.y, obj.color, obj.rot);
+      else if (obj.type==="screen") drawScreen(ctx, obj.x, obj.y, obj.color, obj.rot, obj.id===selected);
     });
 
     // In-progress drawing preview
@@ -2280,6 +2335,11 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
       const pl=players[i];
       const pp=pl.positions?.[stageIdx]||pl.positions?.[0]||{x:0,y:0};
       if (Math.hypot(pos.x-pp.x,pos.y-pp.y)<18) return {id:pl.id,type:"player"};
+    }
+    // Then screens
+    for (let i=drawings.length-1;i>=0;i--) {
+      const d=drawings[i];
+      if (d.type==="screen" && Math.hypot(pos.x-d.x,pos.y-d.y)<20) return {id:d.id,type:"screen"};
     }
     return null;
   };
@@ -2512,6 +2572,15 @@ function moveElement(play, dragging, stageIdx, pos) {
       return {...pl,positions:{...pl.positions,[stageIdx]:pos}};
     });
     return {...play,players};
+  }
+  if (dragging.type==="screen") {
+    const stages=[...(play.stages||[{}])];
+    while (stages.length<=stageIdx) stages.push({drawings:[]});
+    const drawings=(stages[stageIdx].drawings||[]).map(d=>
+      d.id===dragging.id?{...d,x:pos.x,y:pos.y}:d
+    );
+    stages[stageIdx]={...stages[stageIdx],drawings};
+    return {...play,stages};
   }
   return play;
 }
