@@ -4654,17 +4654,35 @@ const MOCK_BOOKS = [
 
 function ResourcesPage({C, dark}){
   const [expanded, setExpanded] = useState(null);
-  const [summaries, setSummaries] = useState({});
+  const [collapsingId, setCollapsingId] = useState(null);
+  const [summaries, setSummaries] = useState(()=>{
+    try{ return JSON.parse(localStorage.getItem("bam_ai_summaries")||"{}"); }catch{ return {}; }
+  });
   const [loadingSummary, setLoadingSummary] = useState(null);
   const [paperTag, setPaperTag] = useState("All");
   const [expandedPaper, setExpandedPaper] = useState(null);
+  const [prodImgErr, setProdImgErr] = useState({});
+  const [doiErr, setDoiErr] = useState({});
+  const [bookImgErr, setBookImgErr] = useState({});
+  const [pageReady, setPageReady] = useState(false);
 
-  const toggleExpand = (id) => setExpanded(prev => prev === id ? null : id);
+  // Prompt 10: loading state
+  useEffect(()=>{const t=setTimeout(()=>setPageReady(true),600);return ()=>clearTimeout(t);},[]);
+
+  // Prompt 2: single expansion — collapse current before opening new
+  const toggleExpand = (id) => {
+    if(expanded===id){setExpanded(null);return;}
+    if(expanded!==null){setCollapsingId(expanded);setExpanded(null);setTimeout(()=>{setCollapsingId(null);setExpanded(id);},250);}
+    else setExpanded(id);
+  };
 
   const generateSummary = async (paper) => {
+    // Prompt 5: check localStorage cache first
     if (summaries[paper.id]) return;
     setLoadingSummary(paper.id);
     try {
+      const controller=new AbortController();
+      const timeout=setTimeout(()=>controller.abort(),15000);
       const resp = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
@@ -4678,12 +4696,20 @@ function ResourcesPage({C, dark}){
           max_tokens: 300,
           messages: [{ role: "user", content: `Summarize this research paper in 3-4 concise bullet points for basketball coaches. Title: "${paper.title}" by ${paper.authors} (${paper.year}). Abstract: ${paper.abstract}` }],
         }),
+        signal:controller.signal,
       });
+      clearTimeout(timeout);
       const data = await resp.json();
-      const text = data?.content?.[0]?.text || "Summary unavailable.";
-      setSummaries(prev => ({ ...prev, [paper.id]: text }));
+      const text = data?.content?.[0]?.text || null;
+      if(text){
+        const updated={...summaries,[paper.id]:text};
+        setSummaries(updated);
+        try{localStorage.setItem("bam_ai_summaries",JSON.stringify(updated));}catch{}
+      } else {
+        setSummaries(prev=>({...prev,[paper.id]:"__error__"}));
+      }
     } catch {
-      setSummaries(prev => ({ ...prev, [paper.id]: "Failed to generate summary. Check your API key." }));
+      setSummaries(prev=>({...prev,[paper.id]:"__error__"}));
     }
     setLoadingSummary(null);
   };
@@ -4693,8 +4719,19 @@ function ResourcesPage({C, dark}){
     <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:sectionColor,letterSpacing:2,marginBottom:16,marginTop:36}}>{text}</div>
   );
 
+  const filteredPapers = MOCK_PAPERS.filter(p=>paperTag==="All"||p.tags.includes(paperTag));
+
+  // Prompt 10: loading screen
+  if(!pageReady) return (
+    <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:dark?"#0D0D0D":"#F5F5F5"}}>
+      <img src={BAM_LOGO_PNG} alt="BAM" style={{width:64,height:64,objectFit:"contain",animation:"bamPulse 1.5s ease-in-out infinite"}} />
+      <style>{`@keyframes bamPulse{0%,100%{transform:scale(1);opacity:0.8}50%{transform:scale(1.15);opacity:1}}`}</style>
+    </div>
+  );
+
   return (
-    <div style={{flex:1,overflow:"auto",padding:28}}>
+    <div style={{flex:1,overflow:"auto",padding:28,animation:"bamFadeIn .4s ease",opacity:1}}>
+      <style>{`@keyframes bamFadeIn{from{opacity:0}to{opacity:1}}`}</style>
       <div style={{maxWidth:900,margin:"0 auto"}}>
         <div style={{marginBottom:8}}>
           <div style={{fontSize:24,fontWeight:800,color:C.text,letterSpacing:.5}}>Resources</div>
@@ -4703,32 +4740,45 @@ function ResourcesPage({C, dark}){
 
         {/* BAM Products */}
         {sectionTitle("BAM PRODUCTS")}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:16}}>
-          {BAM_PRODUCTS.map(p=>(
-            <div key={p.id} style={{background:C.bgCard,border:`1px solid ${expanded===p.id?GOLD+"60":C.border}`,borderRadius:14,overflow:"hidden",cursor:"pointer",transition:"border-color .2s,box-shadow .2s",boxShadow:expanded===p.id?`0 0 0 2px ${GOLD}20`:"none"}}
+        {/* Prompt 3: single column on mobile via CSS media query */}
+        <style>{`@media(max-width:600px){.bam-products-grid{grid-template-columns:1fr !important}}`}</style>
+        <div className="bam-products-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:16}}>
+          {BAM_PRODUCTS.map(p=>{
+            const isOpen=expanded===p.id;
+            const isCollapsing=collapsingId===p.id;
+            return (
+            <div key={p.id} style={{background:C.bgCard,border:`1px solid ${isOpen?GOLD+"60":C.border}`,borderRadius:14,overflow:"hidden",cursor:"pointer",transition:"border-color .2s,box-shadow .2s",boxShadow:isOpen?`0 0 0 2px ${GOLD}20`:"none"}}
               onClick={()=>toggleExpand(p.id)}>
-              <div style={{height:160,background:`${dark?"#2A2A2A":"#E8E8E8"}`,overflow:"hidden",position:"relative"}}>
-                <img src={p.img} alt={p.title} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}
-                  onError={e=>{e.target.style.display="none";}} />
+              {/* Prompt 4: broken product image placeholder */}
+              <div style={{height:160,background:dark?"#2A2A2A":"#E8E8E8",overflow:"hidden",position:"relative"}}>
+                {prodImgErr[p.id]?(
+                  <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",border:`1px solid ${GOLD}30`,borderRadius:0,background:dark?"#1A1A1A":"#E0E0E0"}}>
+                    <img src={BAM_LOGO_PNG} alt="BAM" style={{width:40,height:40,objectFit:"contain",opacity:.5}} />
+                  </div>
+                ):(
+                  <img src={p.img} alt={p.title} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}
+                    onError={()=>setProdImgErr(prev=>({...prev,[p.id]:true}))} />
+                )}
                 <div style={{position:"absolute",bottom:0,left:0,right:0,height:60,background:"linear-gradient(transparent,rgba(0,0,0,0.7))"}} />
               </div>
               <div style={{padding:"14px 16px"}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text,marginBottom:4}}>{p.title}</div>
                 <div style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:GOLD,fontWeight:600}}>
-                  {expanded===p.id?"Collapse":"Learn more"} <ChevronDown size={12} style={{transform:expanded===p.id?"rotate(180deg)":"none",transition:"transform .2s"}} />
+                  {isOpen?"Collapse":"Learn more"} <ChevronDown size={12} style={{transform:isOpen?"rotate(180deg)":"none",transition:"transform .2s"}} />
                 </div>
               </div>
-              {expanded===p.id&&(
+              {/* Prompt 2: smooth expand/collapse */}
+              <div style={{maxHeight:isOpen?300:0,overflow:"hidden",transition:"max-height .25s ease",opacity:isOpen?1:0}}>
                 <div style={{padding:"0 16px 16px"}} onClick={e=>e.stopPropagation()}>
                   <div style={{fontSize:13,color:C.textMid,lineHeight:1.6,marginBottom:14}}>{p.desc}</div>
                   <a href={p.url} target="_blank" rel="noopener noreferrer"
-                    style={{display:"inline-flex",alignItems:"center",gap:6,background:GOLD,color:"#111",padding:"8px 18px",borderRadius:8,fontSize:13,fontWeight:700,textDecoration:"none",fontFamily:"'DM Sans',sans-serif"}}>
+                    style={{display:"inline-flex",alignItems:"center",gap:6,background:GOLD,color:"#111",padding:"8px 18px",borderRadius:8,fontSize:13,fontWeight:700,textDecoration:"none",fontFamily:"'DM Sans',sans-serif",minHeight:44}}>
                     Visit <ExternalLink size={13} />
                   </a>
                 </div>
-              )}
+              </div>
             </div>
-          ))}
+          );})}
         </div>
 
         {/* Podcast */}
@@ -4767,14 +4817,25 @@ function ResourcesPage({C, dark}){
             );
           })}
         </div>
+        {/* Prompt 6: empty state for tag filter */}
+        {filteredPapers.length===0?(
+          <div style={{padding:"48px 0",textAlign:"center"}}>
+            <img src={BAM_LOGO_PNG} alt="BAM" style={{width:48,height:48,objectFit:"contain",opacity:.35,marginBottom:16}} />
+            <div style={{fontSize:15,color:C.textDim,fontWeight:500}}>No results for this category.</div>
+          </div>
+        ):(
         <div style={{display:"grid",gap:14}}>
-          {MOCK_PAPERS.filter(p=>paperTag==="All"||p.tags.includes(paperTag)).map(paper=>{
+          {/* Prompt 7: papers with multiple tags appear for each matching tag */}
+          {filteredPapers.map(paper=>{
             const parchBg = dark ? "#2C2A22" : "#FAF6EC";
             const parchBorder = dark ? "#3D3A2E" : "#E8E0C8";
             const evidenceColors = { Strong:{bg:"#1B5E20",text:"#A5D6A7"}, Moderate:{bg:"#E65100",text:"#FFCC80"}, Preliminary:{bg:"#4A148C",text:"#CE93D8"} };
             const ev = evidenceColors[paper.strength_of_evidence] || evidenceColors.Preliminary;
             const isExpanded = expandedPaper === paper.id;
             const abstractPreview = paper.abstract.length > 180 ? paper.abstract.slice(0,180) + "…" : paper.abstract;
+            const summaryText = summaries[paper.id];
+            const isError = summaryText === "__error__";
+            const googleSearch = `https://www.google.com/search?q=${encodeURIComponent(paper.title+" "+paper.authors)}`;
             return (
               <div key={paper.id} style={{background:parchBg,border:`1px solid ${parchBorder}`,borderRadius:14,padding:"22px 24px",position:"relative",transition:"box-shadow .2s",boxShadow:isExpanded?`0 4px 20px ${dark?"rgba(0,0,0,0.4)":"rgba(0,0,0,0.08)"}`:"none"}}>
                 {/* Evidence badge */}
@@ -4811,21 +4872,37 @@ function ResourcesPage({C, dark}){
                     <Sparkles size={13} />
                     {loadingSummary===paper.id?"Generating...":isExpanded?"Hide AI Summary":"Read AI Summary"}
                   </button>
-                  {paper.doi_url && (
+                  {/* Prompt 8: DOI link with Google fallback */}
+                  {paper.doi_url && !doiErr[paper.id] ? (
                     <a href={paper.doi_url} target="_blank" rel="noopener noreferrer"
+                      onClick={()=>{
+                        // Mark as errored if fetch fails (best-effort check)
+                        fetch(paper.doi_url,{mode:"no-cors",method:"HEAD"}).catch(()=>setDoiErr(prev=>({...prev,[paper.id]:true})));
+                      }}
                       style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:12,fontWeight:600,color:dark?"#A89F80":"#7A7058",textDecoration:"none",fontFamily:"'DM Sans',sans-serif"}}>
                       View Paper <ExternalLink size={11} />
                     </a>
+                  ) : (
+                    <a href={googleSearch} target="_blank" rel="noopener noreferrer"
+                      style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:12,fontWeight:600,color:dark?"#A89F80":"#7A7058",textDecoration:"none",fontFamily:"'DM Sans',sans-serif"}}>
+                      Search this study on Google <ExternalLink size={11} />
+                    </a>
                   )}
                 </div>
-                {/* Expanded AI Summary */}
-                {isExpanded && summaries[paper.id] && (
+                {/* Expanded AI Summary — Prompt 5: cached or error fallback */}
+                {isExpanded && summaryText && !isError && (
                   <div style={{marginTop:14,padding:16,background:dark?"rgba(226,221,159,0.06)":"rgba(226,221,159,0.10)",borderRadius:10,border:`1px solid ${GOLD}20`,fontSize:13,color:dark?"#E8E0C0":"#4A4230",lineHeight:1.7,whiteSpace:"pre-wrap",fontFamily:"'DM Sans',sans-serif"}}>
                     <div style={{fontSize:11,fontWeight:700,color:GOLD,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>AI Summary for Coaches</div>
-                    {summaries[paper.id]}
+                    {summaryText}
                   </div>
                 )}
-                {isExpanded && loadingSummary===paper.id && !summaries[paper.id] && (
+                {isExpanded && isError && (
+                  <div style={{marginTop:14,padding:16,background:dark?"rgba(226,221,159,0.06)":"rgba(226,221,159,0.10)",borderRadius:10,border:`1px solid ${GOLD}20`,fontSize:13,color:dark?"#C8C0A8":"#5A5040",lineHeight:1.7,fontFamily:"'DM Sans',sans-serif"}}>
+                    Read the study for more.
+                    {paper.doi_url&&<div style={{marginTop:8}}><a href={paper.doi_url} target="_blank" rel="noopener noreferrer" style={{fontSize:12,color:GOLD,textDecoration:"none",fontWeight:600}}>View Paper <ExternalLink size={11} style={{verticalAlign:"middle"}} /></a></div>}
+                  </div>
+                )}
+                {isExpanded && loadingSummary===paper.id && !summaryText && (
                   <div style={{marginTop:14,padding:16,textAlign:"center",fontSize:13,color:GOLD,fontFamily:"'DM Sans',sans-serif"}}>
                     Generating summary…
                   </div>
@@ -4834,28 +4911,47 @@ function ResourcesPage({C, dark}){
             );
           })}
         </div>
+        )}
 
         {/* Books */}
         {sectionTitle("RECOMMENDED BOOKS")}
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:14,marginBottom:40}}>
-          {MOCK_BOOKS.map(book=>(
+          {MOCK_BOOKS.map(book=>{
+            const googleBookSearch=`https://www.google.com/search?q=${encodeURIComponent(book.title+" "+book.author)}`;
+            return (
             <div key={book.id} style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:14,padding:20}}>
               <div style={{display:"flex",alignItems:"flex-start",gap:14}}>
-                <div style={{width:44,height:56,borderRadius:6,background:dark?"#2A2A2A":"#E8E8E8",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                  <BookMarked size={20} color={GOLD} />
-                </div>
+                {/* Prompt 8 part 3: book cover placeholder */}
+                {book.coverImg && !bookImgErr[book.id] ? (
+                  <img src={book.coverImg} alt={book.title}
+                    onError={()=>setBookImgErr(prev=>({...prev,[book.id]:true}))}
+                    style={{width:44,height:56,borderRadius:6,objectFit:"cover",flexShrink:0}} />
+                ) : (
+                  <div style={{width:44,height:56,borderRadius:6,background:dark?"#2A2A2A":"#E8E8E8",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <BookMarked size={20} color={GOLD} />
+                  </div>
+                )}
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:2}}>{book.title}</div>
-                  <div style={{fontSize:12,color:GOLD,marginBottom:6}}>{book.author}</div>
+                  {/* Prompt 9: title 2-line truncation, author 1-line truncation */}
+                  <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:2,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{book.title}</div>
+                  <div style={{fontSize:12,color:GOLD,marginBottom:6,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{book.author}</div>
                   <div style={{fontSize:12,color:C.textDim,lineHeight:1.5,marginBottom:10}}>{book.desc}</div>
-                  <a href={book.url} target="_blank" rel="noopener noreferrer"
-                    style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:12,fontWeight:700,color:GOLD,textDecoration:"none"}}>
-                    View on Amazon <ExternalLink size={11} />
-                  </a>
+                  {/* Prompt 8 part 2: Amazon link with Google fallback */}
+                  {book.url?(
+                    <a href={book.url} target="_blank" rel="noopener noreferrer"
+                      style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:12,fontWeight:700,color:GOLD,textDecoration:"none"}}>
+                      View on Amazon <ExternalLink size={11} />
+                    </a>
+                  ):(
+                    <a href={googleBookSearch} target="_blank" rel="noopener noreferrer"
+                      style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:12,fontWeight:700,color:GOLD,textDecoration:"none"}}>
+                      Search on Google <ExternalLink size={11} />
+                    </a>
+                  )}
                 </div>
               </div>
             </div>
-          ))}
+          );})}
         </div>
       </div>
     </div>
@@ -5461,6 +5557,20 @@ export default function BAMFull(){
           {/* Playbook Builder */}
           {nav==="playbook"&&(
             <PlaybookBuilder C={C} dark={dark}/>
+          )}
+
+          {/* 404 fallback for unmatched nav */}
+          {!isContentPage&&nav!=="dashboard"&&nav!=="community"&&nav!=="resources"&&nav!=="playbook"&&(
+            <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",padding:40,textAlign:"center"}}>
+              <img src={BAM_LOGO_PNG} alt="BAM" style={{width:56,height:56,objectFit:"contain",marginBottom:24,opacity:.6}} />
+              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:72,color:GOLD,letterSpacing:4,lineHeight:1}}>404</div>
+              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:C.text,letterSpacing:3,marginTop:8}}>PAGE NOT FOUND</div>
+              <div style={{fontSize:14,color:C.textDim,marginTop:12,maxWidth:340,lineHeight:1.6}}>Looks like this play didn't draw up right.</div>
+              <button onClick={()=>setNav("dashboard")}
+                style={{marginTop:24,padding:"10px 28px",borderRadius:8,fontSize:14,fontWeight:800,background:GOLD,color:"#111",border:"none",cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1}}>
+                Go Back
+              </button>
+            </div>
           )}
         </div>
       {profileName&&<ProfilePanel key={profileName} name={profileName} dark={dark} C={C} onClose={()=>setProfileName(null)}/>}
