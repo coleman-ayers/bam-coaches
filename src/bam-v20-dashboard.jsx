@@ -2483,24 +2483,17 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
   const courtRef  = useRef(null);
   const overlayRef = useRef(null);
   const [tool, setTool]     = useState("select");
-  const [color, setColor]   = useState(DRAW_COLORS[2]); // gold default
-  const [drawing, setDrawing] = useState(null);
+  const [color, setColor]   = useState(DRAW_COLORS[2]);
   const [selected, setSelected] = useState(null);
   const [dragging, setDragging] = useState(null);
   const [history, setHistory]   = useState([]);
   const [histIdx, setHistIdx]   = useState(-1);
   const nextId = useRef(Date.now());
 
-  // objects = persistent players/ball across stages + per-stage drawings
-  // play.players  = [{id,label,color,positions:{0:{x,y},1:{x,y},...}}]
-  // play.ball     = {positions:{0:{x,y},...}}
-  // play.stages[n].drawings = [{id,type,points,color}|{id,type:screen,x,y,color,rot}]
-
   const players  = play?.players  || [];
   const ball     = play?.ball     || null;
   const drawings = play?.stages?.[stageIdx]?.drawings || [];
 
-  // Push history helper
   const pushHist = useCallback((newPlay) => {
     setHistory(prev => { const h=[...prev.slice(0,histIdx+1),newPlay]; setHistIdx(h.length-1); return h; });
     onUpdate && onUpdate(newPlay);
@@ -2513,7 +2506,6 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
     onUpdate && onUpdate(history[ni]);
   },[histIdx,history,onUpdate]);
 
-  // Draw court (and redraw when microscope image loads)
   const redrawCourt = useCallback(() => {
     const cv=courtRef.current; if(!cv) return;
     drawCourt(cv.getContext("2d"), COURT_W, COURT_H, dark, igHandle, xHandle);
@@ -2533,21 +2525,14 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
     const ctx=cv.getContext("2d");
     ctx.clearRect(0,0,COURT_W,COURT_H);
 
-    const t = (animProgress!=null) ? animProgress : 1; // 0..1 eased
+    const t = (animProgress!=null) ? animProgress : 1;
 
-    // Draw drawings for current stage
+    // Draw screens for current stage
     drawings.forEach(obj => {
-      if (obj.type==="arrow") drawArrowPath(ctx, obj.points, obj.color, false);
-      else if (obj.type==="dribble") drawArrowPath(ctx, obj.points, obj.color, true);
-      else if (obj.type==="screen") drawScreen(ctx, obj.x, obj.y, obj.color, obj.rot, obj.id===selected);
+      if (obj.type==="screen") drawScreen(ctx, obj.x, obj.y, obj.color, obj.rot, obj.id===selected);
     });
 
-    // In-progress drawing preview
-    if (drawing?.points?.length>1) {
-      drawArrowPath(ctx, drawing.points, color, drawing.type==="dribble");
-    }
-
-    // Ghost movement lines (show where players came from)
+    // Ghost movement lines during animation
     if (animProgress!=null && prevStageObjs) {
       players.forEach(pl => {
         const prevPos = prevStageObjs.playerPositions?.[pl.id];
@@ -2562,7 +2547,6 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
           ctx.restore();
         }
       });
-      // Ball ghost
       if (prevStageObjs.ballPos && ball?.positions?.[stageIdx]) {
         const bp=prevStageObjs.ballPos, cp=ball.positions[stageIdx];
         if (bp.x!==cp.x||bp.y!==cp.y) {
@@ -2605,7 +2589,7 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
       drawBall(ctx, bx, by, selected==="ball");
     }
 
-  },[players,ball,drawings,drawing,selected,dark,animProgress,prevStageObjs,stageIdx,color]);
+  },[players,ball,drawings,selected,dark,animProgress,prevStageObjs,stageIdx]);
 
   const getPos = (e) => {
     const r=overlayRef.current.getBoundingClientRect();
@@ -2616,18 +2600,15 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
   };
 
   const hitTestEl = (pos) => {
-    // Check ball first
     if (ball) {
       const bp=ball.positions?.[stageIdx]||ball.positions?.[0]||{x:0,y:0};
       if (Math.hypot(pos.x-bp.x,pos.y-bp.y)<16) return {id:"ball",type:"ball"};
     }
-    // Then players
     for (let i=players.length-1;i>=0;i--) {
       const pl=players[i];
       const pp=pl.positions?.[stageIdx]||pl.positions?.[0]||{x:0,y:0};
       if (Math.hypot(pos.x-pp.x,pos.y-pp.y)<18) return {id:pl.id,type:"player"};
     }
-    // Then screens
     for (let i=drawings.length-1;i>=0;i--) {
       const d=drawings[i];
       if (d.type==="screen" && Math.hypot(pos.x-d.x,pos.y-d.y)<20) return {id:d.id,type:"screen"};
@@ -2644,27 +2625,10 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
       const hit=hitTestEl(pos);
       setSelected(hit?hit.id:null);
       if (hit) setDragging(hit);
-    } else if (tool==="erase") {
-      // Erase a drawing on current stage
-      // Find closest screen or arrow endpoint
-      const newDrawings=drawings.filter(obj => {
-        if (obj.type==="screen") return Math.hypot(pos.x-obj.x,pos.y-obj.y)>20;
-        if (obj.points) {
-          const last=obj.points[obj.points.length-1];
-          return Math.hypot(pos.x-last.x,pos.y-last.y)>20;
-        }
-        return true;
-      });
-      if (newDrawings.length!==drawings.length) {
-        const newPlay=setStageDrawings(play,stageIdx,newDrawings);
-        pushHist(newPlay);
-      }
     } else if (tool==="screen") {
       const id=nextId.current++;
       const newD=[...drawings,{id,type:"screen",x:pos.x,y:pos.y,color,rot:0}];
       pushHist(setStageDrawings(play,stageIdx,newD));
-    } else if (tool==="arrow"||tool==="dribble") {
-      setDrawing({type:tool,points:[pos],color});
     }
   };
 
@@ -2673,7 +2637,6 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
     e.preventDefault();
     const pos=getPos(e);
     if (dragging) {
-      // Sticky ball: if dragging a player and the ball is at the same position, move ball too
       let newPlay=moveElement(play,dragging,stageIdx,pos);
       if (dragging.type==="player" && ball) {
         const playerPrevPos = play.players.find(p=>p.id===dragging.id)?.positions?.[stageIdx] || play.players.find(p=>p.id===dragging.id)?.positions?.[0];
@@ -2687,33 +2650,20 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
           }
         }
       }
-      onUpdate && onUpdate(newPlay); // live update without history push
-    } else if (drawing) {
-      const last=drawing.points[drawing.points.length-1];
-      if ((pos.x-last.x)**2+(pos.y-last.y)**2>16)
-        setDrawing(prev=>({...prev,points:[...prev.points,pos]}));
+      onUpdate && onUpdate(newPlay);
     }
   };
 
   const onUp = (e) => {
     if (readOnly) return;
     if (dragging) { pushHist(play); setDragging(null); }
-    if (drawing?.points?.length>1) {
-      const id=nextId.current++;
-      const newD=[...drawings,{id,type:drawing.type,points:drawing.points,color:drawing.color}];
-      pushHist(setStageDrawings(play,stageIdx,newD));
-    }
-    setDrawing(null);
   };
-
-  const clearDrawings = () => { pushHist(setStageDrawings(play,stageIdx,[])); };
 
   const addPlayer = () => {
     const n=players.length;
     const labels=["1","2","3","4","5","X","G","F","C","D"];
     const sp=[{x:140+n*30,y:200},{x:200,y:150},{x:200,y:250},{x:120,y:130},{x:120,y:270}];
     const pos=sp[n]||{x:140+n*20,y:200};
-    // Give player same pos for all existing stages
     const positions={};
     const stageCount=play?.stages?.length||1;
     for(let i=0;i<stageCount;i++) positions[i]={...pos};
@@ -2733,12 +2683,19 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
   const deleteSelected = () => {
     if (!selected) return;
     if (selected==="ball") { pushHist({...play,ball:null}); setSelected(null); return; }
+    // Check if it's a screen
+    const screenMatch = drawings.find(d=>d.id===selected&&d.type==="screen");
+    if (screenMatch) {
+      const newD=drawings.filter(d=>d.id!==selected);
+      pushHist(setStageDrawings(play,stageIdx,newD));
+      setSelected(null);
+      return;
+    }
     pushHist({...play,players:players.filter(p=>p.id!==selected)});
     setSelected(null);
   };
 
   const rotateScreen = () => {
-    // Rotate selected screen 45 degrees
     const newD=drawings.map(d=>d.type==="screen"&&d.id===selected?{...d,rot:(d.rot||0)+45}:d);
     pushHist(setStageDrawings(play,stageIdx,newD));
   };
@@ -2747,7 +2704,6 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
 
   const addOffensivePlayer = useCallback(() => {
     if (readOnly) return;
-    const n=players.length;
     const oLabels=["1","2","3","4","5"];
     const cx_=COURT_W/2, cy_=COURT_H/2;
     const oCount=players.filter(p=>!p.label.startsWith("X")).length;
@@ -2775,22 +2731,22 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
   useEffect(() => {
     if (readOnly) return;
     const handler = (e) => {
-      // Ignore if user is typing in an input/textarea
       if (e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA"||e.target.tagName==="SELECT") return;
       if (e.key==="n"||e.key==="N") { e.preventDefault(); addOffensivePlayer(); }
       else if (e.key==="d"||e.key==="D") { e.preventDefault(); addDefensivePlayer(); }
       else if (e.key==="Enter") { e.preventDefault(); onNextStage && onNextStage(); }
       else if ((e.metaKey||e.ctrlKey)&&e.key==="z") { e.preventDefault(); undo(); }
+      else if (e.key==="Delete"||e.key==="Backspace") { e.preventDefault(); deleteSelected(); }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  },[readOnly,addOffensivePlayer,addDefensivePlayer,onNextStage,undo]);
+  },[readOnly,addOffensivePlayer,addDefensivePlayer,onNextStage,undo,deleteSelected]);
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:8}}>
       {!readOnly && (
         <>
-          {/* Row 1: actions */}
+          {/* Toolbar */}
           <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
             <div style={{display:"flex",gap:3,background:dark?"#111":"#e8e8e8",borderRadius:10,padding:3}}>
               <button onClick={()=>{setTool("select");}}
@@ -2808,7 +2764,6 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
                 ▬ Screen
               </button>
             </div>
-            {/* Draw colors (for screens) */}
             {tool==="screen" && (
               <div style={{display:"flex",gap:5}}>
                 {DRAW_COLORS.map(cl=>(
@@ -2825,11 +2780,6 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
                 style={{padding:"5px 10px",borderRadius:7,border:`1px solid ${dark?"#333":"#ccc"}`,cursor:"pointer",
                   background:"transparent",color:dark?"#888":"#666",fontSize:12,fontWeight:700}}>
                 ↩ Undo
-              </button>
-              <button onClick={clearDrawings}
-                style={{padding:"5px 10px",borderRadius:7,border:`1px solid ${dark?"#333":"#ccc"}`,cursor:"pointer",
-                  background:"transparent",color:dark?"#888":"#666",fontSize:12,fontWeight:700}}>
-                Clear
               </button>
               {selected && (
                 <>
@@ -2849,7 +2799,7 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
               )}
             </div>
           </div>
-          {/* Row 2: add elements */}
+          {/* Add elements row */}
           <div style={{display:"flex",gap:7,alignItems:"center"}}>
             <span style={{fontSize:11,fontWeight:700,color:C.textDim,textTransform:"uppercase",letterSpacing:.8}}>Add:</span>
             <button onClick={addPlayer}
@@ -2864,8 +2814,8 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
                 ◉ Ball
               </button>
             )}
-            <span style={{fontSize:11,color:C.textDim,marginLeft:4}}>
-              {tool==="screen"?"Click court to place a screen.":"Drag players & ball to reposition. Ball follows the player holding it."}
+            <span style={{fontSize:12,color:C.textDim,marginLeft:4}}>
+              {tool==="screen"?"Click court to place a screen.":"Drag players and ball to position them. Press Enter for next stage."}
             </span>
           </div>
         </>
@@ -2877,13 +2827,13 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
         <canvas ref={courtRef} width={COURT_W} height={COURT_H} style={{display:"block",width:"100%",height:"auto"}}/>
         <canvas ref={overlayRef} width={COURT_W} height={COURT_H}
           style={{position:"absolute",top:0,left:0,width:"100%",height:"auto",
-            cursor:readOnly?"default":tool==="select"?"grab":tool==="screen"?"crosshair":"grab"}}
+            cursor:readOnly?"default":tool==="select"?"grab":"crosshair"}}
           onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
           onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp}/>
       </div>
       {!readOnly && (
         <div style={{display:"flex",gap:12,flexWrap:"wrap",opacity:0.5,fontSize:10,color:C.textDim,marginTop:2}}>
-          {[["N","Add offense"],["D","Add defense"],["Enter","Next stage"],["\u2318Z","Undo"]].map(([k,v])=>(
+          {[["N","Add offense"],["D","Add defense"],["Enter","Next stage"],["\u2318Z","Undo"],["Del","Delete selected"]].map(([k,v])=>(
             <span key={k}><kbd style={{background:dark?"#222":"#e0e0e0",padding:"1px 4px",borderRadius:3,fontFamily:"monospace",fontSize:10,border:`1px solid ${dark?"#333":"#ccc"}`}}>{k}</kbd> {v}</span>
           ))}
         </div>
@@ -2953,10 +2903,9 @@ function PlaybookBuilder({ C, dark }) {
   const [walkStep, setWalkStep] = useState(()=>{try{return localStorage.getItem("bam_pb_walkthrough_done")==="1"?-1:0;}catch{return 0;}});
   const [showHelp, setShowHelp] = useState(false);
   const WALK_STEPS=[
-    {title:"Place Players",desc:"Click 'Player' to add offensive players to the court. Drag them to position.",highlight:"add-player"},
-    {title:"Add Defenders",desc:"Press D or click to add defensive players (shown in red). Position them against offense.",highlight:"add-player"},
-    {title:"Draw Arrows",desc:"Select the arrow tool to draw movement paths and passing lanes between players.",highlight:"canvas"},
-    {title:"Use Screens",desc:"Add screens to create picks and off-ball actions. Rotate them with the toolbar.",highlight:"add-player"},
+    {title:"Place Players",desc:"Click 'Player' to add offensive and defensive players to the court. Drag them into position for Stage 1.",highlight:"add-player"},
+    {title:"Next Stage",desc:"Press Enter or click 'Next Stage' to advance. Players stay in place — drag them to their new positions. Add screens for picks and off-ball actions.",highlight:"canvas"},
+    {title:"Play It Back",desc:"Press the Play button to watch your full play animate — players glide smoothly between each stage.",highlight:"canvas"},
   ];
   const dismissWalkthrough=()=>{setWalkStep(-1);try{localStorage.setItem("bam_pb_walkthrough_done","1");}catch{};};
   const reopenWalkthrough=()=>{setWalkStep(0);setShowHelp(false);};
@@ -3034,7 +2983,7 @@ function PlaybookBuilder({ C, dark }) {
       });
       setStageIdx(toIdx);
 
-      const duration=800, start=performance.now();
+      const duration=2500, start=performance.now();
       const frame=(now)=>{
         const raw=Math.min((now-start)/duration,1);
         const eased=easeInOut(raw);
@@ -3427,7 +3376,7 @@ function PlaybookBuilder({ C, dark }) {
 
                 <div style={{marginTop:12,display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
                   <span style={{fontSize:13,color:C.textDim,lineHeight:1.5}}>
-                    <b style={{color:C.textMid,fontSize:14}}>Stage {stageIdx+1}:</b> Position players and ball, then draw arrows and screens for this stage. Each stage resets drawings.
+                    <b style={{color:C.textMid,fontSize:14}}>Stage {stageIdx+1}:</b> Drag players and ball to position them. Press Enter or click "Next Stage" to add a new stage.
                   </span>
                   {totalStages>=2&&(
                     <span style={{fontSize:11,color:GOLD,marginLeft:"auto"}}>
@@ -3435,6 +3384,26 @@ function PlaybookBuilder({ C, dark }) {
                     </span>
                   )}
                 </div>
+                {/* Stage indicator bar */}
+                {totalStages>=2&&(
+                  <div style={{marginTop:10,display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+                    {currentPlay.stages.map((_,i)=>(
+                      <div key={i} onClick={()=>!isAnimating&&setStageIdx(i)}
+                        style={{display:"flex",alignItems:"center",gap:4,cursor:isAnimating?"default":"pointer"}}>
+                        <div style={{
+                          width:32,height:32,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",
+                          fontSize:13,fontWeight:800,transition:"all .25s",
+                          background:stageIdx===i?GOLD:"transparent",
+                          color:stageIdx===i?"#111":C.textDim,
+                          border:`2px solid ${stageIdx===i?GOLD:C.border}`,
+                        }}>{i+1}</div>
+                        {i<totalStages-1&&(
+                          <div style={{width:24,height:2,background:i<stageIdx?GOLD:C.border,borderRadius:1,transition:"background .25s"}}/>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
