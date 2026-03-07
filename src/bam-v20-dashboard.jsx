@@ -646,7 +646,10 @@ function DrillSearchPanel({ block, C, dark, onAddDrill, onRemoveDrill, pdpSlot, 
       {/* Drill list */}
       <div style={{ flex:1, overflowY:"auto", padding:"8px 14px 14px" }}>
         {filtered.length === 0 && (
-          <div style={{ textAlign:"center", padding:"40px 0", color:C.textDim, fontSize:13 }}>No drills found.</div>
+          <div style={{ textAlign:"center", padding:"40px 0", color:C.textDim }}>
+            <img src={BAM_LOGO_PNG} alt="BAM" style={{width:36,height:36,objectFit:"contain",opacity:.35,marginBottom:12}} />
+            <div style={{fontSize:13}}>No drills found — try a different search.</div>
+          </div>
         )}
         {filtered.map(drill => {
           const alreadyAdded = isDrillAdded(drill);
@@ -708,8 +711,23 @@ function PracticePlansPage({ C, dark }) {
   // Drill drag state
   const [drillDrag, setDrillDrag] = useState(null);
   const [drillDropTarget, setDrillDropTarget] = useState(null);
+  // Prompt 1: block limit message
+  const [blockLimitMsg, setBlockLimitMsg] = useState("");
+  // Prompt 5: auto-save
+  const [autoSaveMsg, setAutoSaveMsg] = useState("");
+  const [draftBanner, setDraftBanner] = useState(()=>{try{const d=localStorage.getItem("bam_plan_draft");return d?true:false;}catch{return false;}});
+  // Prompt 6: duplicate name warning
+  const [nameExistsWarn, setNameExistsWarn] = useState("");
+  // Prompt 6: plan limit warning
+  const [planLimitMsg, setPlanLimitMsg] = useState("");
+  // Prompt 7: delete confirmation
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  // Prompt 2: custom block validation
+  const [customBlockErrors, setCustomBlockErrors] = useState({});
+  // Prompt 3: duplicate drill toast
+  const [drillToast, setDrillToast] = useState("");
 
-  const totalMins = blocks.reduce((s, b) => s + b.duration, 0);
+  const totalMins = blocks.reduce((s, b) => s + (b.duration || 0), 0);
 
   const loadTemplate = (key) => {
     const tpl = PLAN_TEMPLATES[key];
@@ -720,21 +738,34 @@ function PracticePlansPage({ C, dark }) {
     setActivePdpSlot(null);
   };
 
+  const MAX_BLOCKS = 15;
   const insertBlockAt = (typeId, idx, customName) => {
+    if (blocks.length >= MAX_BLOCKS) {
+      setBlockLimitMsg("Maximum 15 blocks per plan");
+      setTimeout(()=>setBlockLimitMsg(""),3000);
+      return null;
+    }
     const b = newBlock(typeId, customName ? { customName } : {});
     setBlocks(prev => { const a = [...prev]; a.splice(idx, 0, b); return a; });
     setActiveBlockId(b.id);
     setActivePdpSlot(null);
     setSaved(false);
+    setBlockLimitMsg("");
     return b;
   };
 
   const addBlock = (typeId, customName) => {
+    if (blocks.length >= MAX_BLOCKS) {
+      setBlockLimitMsg("Maximum 15 blocks per plan");
+      setTimeout(()=>setBlockLimitMsg(""),3000);
+      return;
+    }
     const b = newBlock(typeId, customName ? { customName } : {});
     setBlocks(prev => [...prev, b]);
     setActiveBlockId(b.id);
     setActivePdpSlot(null);
     setSaved(false);
+    setBlockLimitMsg("");
   };
 
   const removeBlock = (id) => {
@@ -759,10 +790,15 @@ function PracticePlansPage({ C, dark }) {
     setPdpSlotDrill(blockId, slot, null);
   };
 
-  // Regular drill handlers
+  // Regular drill handlers — Prompt 3: allow duplicates with warning toast
   const addDrillToBlock = (blockId, drill) => {
+    const block = blocks.find(b=>b.id===blockId);
+    if(block && block.drills.some(d=>d.id===drill.id && d.section===drill.section)){
+      setDrillToast("This drill is already in this block");
+      setTimeout(()=>setDrillToast(""),2500);
+    }
     setBlocks(b => b.map(x => x.id === blockId
-      ? { ...x, drills: x.drills.some(d => d.id === drill.id && d.section === drill.section) ? x.drills : [...x.drills, { ...drill, drillNotes: "" }] }
+      ? { ...x, drills: [...x.drills, { ...drill, drillNotes: "" }] }
       : x));
     setSaved(false);
   };
@@ -862,7 +898,7 @@ function PracticePlansPage({ C, dark }) {
   const [namePromptVisible, setNamePromptVisible] = useState(false);
   const planNameRef = useRef(null);
 
-  // Save plan — Prompt 6: validation
+  // Save plan — with validations
   const savePlan = () => {
     if (blocks.length === 0) return;
     if (!planName.trim()) {
@@ -871,8 +907,34 @@ function PracticePlansPage({ C, dark }) {
       setTimeout(()=>planNameRef.current?.focus(),50);
       return;
     }
+    // Prompt 2: validate custom block names
+    const errs = {};
+    blocks.forEach(b=>{
+      const{category}=findBlockMeta(b.type);
+      if(category.isCustom && !b.customName.trim()) errs[b.id]="Please name this block";
+    });
+    if(Object.keys(errs).length>0){setCustomBlockErrors(errs);return;}
+    setCustomBlockErrors({});
+
     setNamePromptVisible(false);
     const name = planName.trim();
+
+    // Prompt 6: duplicate name check
+    if(savedPlans.some(p=>p.name.toLowerCase()===name.toLowerCase())){
+      setNameExistsWarn("A plan with this name already exists — choose a different name");
+      setEditingName(true);
+      setTimeout(()=>planNameRef.current?.focus(),50);
+      return;
+    }
+    setNameExistsWarn("");
+
+    // Prompt 6: plan cap
+    if(savedPlans.length>=50){
+      setPlanLimitMsg("You've reached the maximum of 50 saved plans. Delete a plan to save a new one.");
+      setTimeout(()=>setPlanLimitMsg(""),5000);
+      return;
+    }
+
     const plan = {
       id: Date.now(),
       name,
@@ -888,9 +950,12 @@ function PracticePlansPage({ C, dark }) {
       totalMins,
       createdAt: new Date().toISOString(),
     };
-    const updated = [plan, ...savedPlans.filter(p => p.name !== name)];
+    const updated = [plan, ...savedPlans];
     setSavedPlans(updated);
     try { localStorage.setItem("bam_saved_plans", JSON.stringify(updated)); } catch {}
+    // Clear auto-save draft on successful save
+    try { localStorage.removeItem("bam_plan_draft"); } catch {}
+    setDraftBanner(false);
     setPlanName(name);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
@@ -923,58 +988,121 @@ function PracticePlansPage({ C, dark }) {
     setSaved(true);
   };
 
-  const deleteSavedPlan = (id) => {
+  const doDeleteSavedPlan = (id) => {
     const updated = savedPlans.filter(p => p.id !== id);
     setSavedPlans(updated);
     try { localStorage.setItem("bam_saved_plans", JSON.stringify(updated)); } catch {}
+    setDeleteConfirm(null);
   };
 
-  // Export PDF
+  // Prompt 5: auto-save every 60 seconds
+  useEffect(()=>{
+    if(blocks.length===0) return;
+    const iv=setInterval(()=>{
+      try{
+        localStorage.setItem("bam_plan_draft",JSON.stringify({planName,blocks,ts:Date.now()}));
+        setAutoSaveMsg("Auto-saved");
+        setTimeout(()=>setAutoSaveMsg(""),2000);
+      }catch{}
+    },60000);
+    return ()=>clearInterval(iv);
+  },[blocks,planName]);
+
+  // Prompt 5: resume draft
+  const resumeDraft = () => {
+    try{
+      const d=JSON.parse(localStorage.getItem("bam_plan_draft")||"null");
+      if(d){
+        setPlanName(d.planName||"");
+        setBlocks((d.blocks||[]).map(b=>{
+          const block=newBlock(b.type,{customName:b.customName||"",duration:b.duration,notes:b.notes||""});
+          block.drills=(b.drills||[]).map(dr=>{
+            const full=ALL_DRILLS.find(ad=>ad.id===dr.id&&ad.section===dr.section);
+            return full?{...full,drillNotes:dr.drillNotes||""}:{...dr,drillNotes:dr.drillNotes||""};
+          });
+          if(b.pdpSlots){
+            block.pdpSlots={};
+            ["game1","drill","game2"].forEach(slot=>{
+              if(b.pdpSlots[slot]){
+                const full=ALL_DRILLS.find(ad=>ad.id===b.pdpSlots[slot].id&&ad.section===b.pdpSlots[slot].section);
+                block.pdpSlots[slot]=full?{...full}:b.pdpSlots[slot];
+              }else block.pdpSlots[slot]=null;
+            });
+          }
+          return block;
+        }));
+      }
+    }catch{}
+    setDraftBanner(false);
+  };
+  const discardDraft = () => {
+    try{localStorage.removeItem("bam_plan_draft");}catch{}
+    setDraftBanner(false);
+  };
+
+  // Export PDF — Prompt 8: branded dark theme
   const exportPDF = () => {
     if (blocks.length === 0) return;
     const name = planName.trim() || "Practice Plan";
+    const pageHeader = `<div class="page-header"><img src="${BAM_LOGO_PNG}" class="logo"/><span class="plan-title">${name}</span></div>`;
     let html = `<html><head><title>${name}</title><style>
-      body{font-family:'Helvetica Neue',Arial,sans-serif;max-width:700px;margin:40px auto;color:#222;padding:0 20px;}
-      h1{font-size:24px;border-bottom:2px solid #E2DD9F;padding-bottom:8px;margin-bottom:4px;}
-      .meta{font-size:13px;color:#666;margin-bottom:24px;}
-      .block{margin-bottom:20px;border:1px solid #ddd;border-radius:8px;overflow:hidden;}
-      .block-header{padding:12px 16px;background:#f8f6f0;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eee;}
-      .block-header .type{font-weight:700;font-size:14px;}
-      .block-header .dur{font-size:12px;color:#888;}
-      .block-notes{padding:8px 16px;font-size:12px;color:#555;font-style:italic;border-bottom:1px solid #f0f0f0;}
-      .drill{padding:8px 16px;font-size:13px;border-bottom:1px solid #f5f5f5;}
+      @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;600;700&display=swap');
+      *{box-sizing:border-box;}
+      body{font-family:'DM Sans',sans-serif;max-width:700px;margin:0 auto;color:#F2F2F2;padding:0 20px;background:#0D0D0D;}
+      .page-header{display:flex;align-items:center;gap:12px;padding:20px 0 16px;border-bottom:2px solid #E2DD9F;margin-bottom:20px;}
+      .page-header .logo{width:32px;height:32px;object-fit:contain;}
+      .page-header .plan-title{font-family:'Bebas Neue',sans-serif;font-size:24px;color:#E2DD9F;letter-spacing:2px;}
+      .meta{font-size:13px;color:#888;margin-bottom:24px;}
+      .block{margin-bottom:16px;border:1px solid #2A2A2A;border-radius:10px;overflow:hidden;background:#1A1A1A;}
+      .block-header{padding:12px 16px;background:#222;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #2A2A2A;}
+      .block-header .type{font-weight:700;font-size:14px;color:#F2F2F2;}
+      .block-header .dur{font-size:12px;color:#E2DD9F;font-weight:600;}
+      .block-notes{padding:8px 16px;font-size:12px;color:#888;font-style:italic;border-bottom:1px solid #2A2A2A;}
+      .drill{padding:8px 16px;font-size:13px;border-bottom:1px solid #222;color:#F2F2F2;}
       .drill:last-child{border-bottom:none;}
       .drill-title{font-weight:600;}
       .drill-notes{font-size:11px;color:#888;margin-top:2px;font-style:italic;}
-      .pdp-slot{padding:8px 16px;border-bottom:1px solid #f5f5f5;}
-      .pdp-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:3px;}
-      @media print{body{margin:20px;}}
+      .drill-empty{padding:8px 16px;font-size:13px;color:#666;font-style:italic;}
+      .pdp-slot{padding:10px 16px;border-bottom:1px solid #222;}
+      .pdp-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#E2DD9F;margin-bottom:4px;}
+      .pdp-empty{color:#666;font-style:italic;}
+      .page-footer{text-align:center;font-size:10px;color:#666;padding:16px 0;border-top:1px solid #2A2A2A;margin-top:20px;}
+      @media print{body{margin:20px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+      @page{margin:15mm;}
     </style></head><body>`;
-    html += `<h1>${name}</h1>`;
+    html += pageHeader;
     html += `<div class="meta">${totalMins} minutes | ${blocks.length} blocks</div>`;
     let cumMins = 0;
-    blocks.forEach(b => {
+    blocks.forEach((b,bi) => {
       const { category, sub } = findBlockMeta(b.type);
       const blockLabel = b.customName || (sub ? sub.label : category.label);
+      const dur = b.duration || 0;
+      const durLabel = dur > 0 ? `${cumMins}-${cumMins+dur} min (${dur} min)` : "N/A";
       html += `<div class="block">`;
-      html += `<div class="block-header"><span class="type">${blockLabel}</span><span class="dur">${cumMins}-${cumMins+b.duration} min (${b.duration} min)</span></div>`;
+      html += `<div class="block-header"><span class="type">${blockLabel}</span><span class="dur">${durLabel}</span></div>`;
       if (b.notes) html += `<div class="block-notes">${b.notes}</div>`;
       if (b.pdpSlots) {
         [["game1","Game 1"],["drill","Drill"],["game2","Game 2"]].forEach(([key,lbl]) => {
           const sd = b.pdpSlots[key];
-          html += `<div class="pdp-slot"><div class="pdp-label">${lbl}</div><div class="drill-title">${sd ? sd.title : "Empty"}</div></div>`;
-        });
-      } else {
-        b.drills.forEach(d => {
-          html += `<div class="drill"><div class="drill-title">${d.title}</div>`;
-          if (d.drillNotes) html += `<div class="drill-notes">${d.drillNotes}</div>`;
+          html += `<div class="pdp-slot"><div class="pdp-label">${lbl}</div>`;
+          html += sd ? `<div class="drill-title">${sd.title}</div>` : `<div class="pdp-empty">Empty</div>`;
           html += `</div>`;
         });
-        if (b.drills.length === 0) html += `<div class="drill" style="color:#aaa">No drills added</div>`;
+      } else {
+        if(b.drills.length===0){
+          html += `<div class="drill-empty">No drills added</div>`;
+        } else {
+          b.drills.forEach(d => {
+            html += `<div class="drill"><div class="drill-title">${d.title}</div>`;
+            if (d.drillNotes) html += `<div class="drill-notes">${d.drillNotes}</div>`;
+            html += `</div>`;
+          });
+        }
       }
       html += `</div>`;
-      cumMins += b.duration;
+      if(dur>0) cumMins += dur;
     });
+    html += `<div class="page-footer">BAM Coaches Platform · Page 1</div>`;
     html += `</body></html>`;
     const w = window.open("", "_blank");
     w.document.write(html);
@@ -1089,19 +1217,21 @@ function PracticePlansPage({ C, dark }) {
               </div>
               {showSavedPlans ? <ChevronUp size={11} color={C.textDim}/> : <ChevronDown size={11} color={C.textDim}/>}
             </div>
-            {showSavedPlans && savedPlans.map(p => (
+            {showSavedPlans && savedPlans.map(p => {
+              const truncName = p.name.length > 30 ? p.name.slice(0,30)+"…" : p.name;
+              return (
               <div key={p.id} style={{ padding:"7px 10px", borderRadius:7, border:`1px solid ${C.border}`,
                 marginBottom:4, background:C.bgHover, cursor:"pointer", position:"relative" }}>
                 <div className="btn" onClick={() => loadSavedPlan(p)}>
-                  <div style={{ fontSize:11, fontWeight:700, color:C.text, marginBottom:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", paddingRight:16 }}>{p.name}</div>
+                  <div style={{ fontSize:11, fontWeight:700, color:C.text, marginBottom:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", paddingRight:16 }} title={p.name}>{truncName}</div>
                   <div style={{ fontSize:9, color:C.textDim }}>{p.totalMins} min · {p.blocks.length} blocks</div>
                 </div>
-                <div className="btn" onClick={e => { e.stopPropagation(); deleteSavedPlan(p.id); }}
+                <div className="btn" onClick={e => { e.stopPropagation(); setDeleteConfirm(p.id); }}
                   style={{ position:"absolute", top:7, right:8 }}>
                   <Trash2 size={9} color={C.textDim}/>
                 </div>
               </div>
-            ))}
+            );})}
           </div>
         </div>
       </div>
@@ -1244,7 +1374,7 @@ function PracticePlansPage({ C, dark }) {
                         {sub && <div style={{ fontSize:10, color:color, fontWeight:600, background:color+"18", padding:"2px 8px", borderRadius:8 }}>{category.label}</div>}
                       </div>
                       <div style={{ fontSize:10, color:C.textDim, marginTop:2 }}>
-                        {cumMins}-{cumMins+b.duration} min
+                        {b.duration ? `${cumMins}-${cumMins+b.duration} min` : "N/A"}
                       </div>
                     </div>
                     {/* Duration selector */}
@@ -1374,16 +1504,36 @@ function PracticePlansPage({ C, dark }) {
                     </div>
                   )}
 
-                  {/* Add drills CTA (non-PDP only) */}
-                  {!isPDP && (
+                  {/* Prompt 4: empty state for blocks with no drills */}
+                  {!isPDP && b.drills.length === 0 && (
+                    <div style={{ padding:"8px 14px 8px 58px" }}>
+                      <div style={{ border:`1px dashed ${C.border}`, borderRadius:8, padding:"14px 16px",
+                        textAlign:"center", color:C.textDim, fontSize:12 }}>
+                        No drills added yet
+                        <div className="btn" onClick={() => { setActiveBlockId(b.id); setActivePdpSlot(null); }}
+                          style={{ display:"inline-flex", alignItems:"center", gap:4, color:GOLD, fontWeight:700,
+                            marginTop:8, fontSize:11 }}>
+                          <Plus size={11} color={GOLD}/> Add Drill
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {/* Add drills CTA (non-PDP only, when drills exist) */}
+                  {!isPDP && b.drills.length > 0 && (
                     <div style={{ padding:"2px 14px 10px 58px" }}>
                       <div className="btn" onClick={() => { setActiveBlockId(b.id); setActivePdpSlot(null); }}
                         style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"5px 12px",
-                          borderRadius:7, border:`1px dashed ${b.drills.length>0?GOLD+"50":C.border}`,
-                          fontSize:11, color:b.drills.length>0?GOLD:C.textDim, fontWeight:600 }}>
-                        <Plus size={11} color={b.drills.length>0?GOLD:C.textDim}/>
-                        {b.drills.length > 0 ? `${b.drills.length} drill${b.drills.length>1?"s":""} - add more` : "Add drills"}
+                          borderRadius:7, border:`1px dashed ${GOLD}50`,
+                          fontSize:11, color:GOLD, fontWeight:600 }}>
+                        <Plus size={11} color={GOLD}/>
+                        {`${b.drills.length} drill${b.drills.length>1?"s":""} - add more`}
                       </div>
+                    </div>
+                  )}
+                  {/* Prompt 2: custom block name validation error */}
+                  {customBlockErrors[b.id] && (
+                    <div style={{ padding:"2px 14px 8px 58px", fontSize:11, color:"#E06060", fontWeight:600 }}>
+                      {customBlockErrors[b.id]}
                     </div>
                   )}
                 </div>
@@ -1429,6 +1579,75 @@ function PracticePlansPage({ C, dark }) {
               }
             }}
           />
+        </div>
+      )}
+
+      {/* Prompt 1: block limit message */}
+      {blockLimitMsg && (
+        <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"#E06060",color:"#fff",
+          padding:"10px 24px",borderRadius:10,fontSize:13,fontWeight:700,zIndex:9999,boxShadow:"0 4px 20px rgba(0,0,0,0.4)",
+          fontFamily:"'DM Sans',sans-serif"}}>{blockLimitMsg}</div>
+      )}
+
+      {/* Prompt 3: duplicate drill toast */}
+      {drillToast && (
+        <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:dark?"#333":"#555",color:"#fff",
+          padding:"10px 24px",borderRadius:10,fontSize:13,fontWeight:600,zIndex:9999,boxShadow:"0 4px 20px rgba(0,0,0,0.4)",
+          fontFamily:"'DM Sans',sans-serif"}}>{drillToast}</div>
+      )}
+
+      {/* Prompt 5: auto-save confirmation */}
+      {autoSaveMsg && (
+        <div style={{position:"fixed",top:16,right:24,background:dark?"rgba(226,221,159,0.15)":"rgba(226,221,159,0.25)",
+          color:GOLD,padding:"8px 18px",borderRadius:8,fontSize:12,fontWeight:700,zIndex:9999,
+          border:`1px solid ${GOLD}40`,fontFamily:"'DM Sans',sans-serif"}}>{autoSaveMsg}</div>
+      )}
+
+      {/* Prompt 5: draft banner */}
+      {draftBanner && blocks.length===0 && (
+        <div style={{position:"fixed",top:64,left:"50%",transform:"translateX(-50%)",background:dark?"#1A1A1A":"#fff",
+          border:`1px solid ${GOLD}50`,borderRadius:12,padding:"14px 24px",zIndex:9999,
+          boxShadow:`0 8px 30px rgba(0,0,0,0.5)`,display:"flex",alignItems:"center",gap:16,
+          fontFamily:"'DM Sans',sans-serif"}}>
+          <div style={{fontSize:13,color:C.text,fontWeight:500}}>You have an unsaved plan draft — continue editing?</div>
+          <div style={{display:"flex",gap:8}}>
+            <div className="btn" onClick={resumeDraft}
+              style={{padding:"6px 16px",borderRadius:7,fontSize:12,fontWeight:800,background:GOLD,color:"#111"}}>Resume</div>
+            <div className="btn" onClick={discardDraft}
+              style={{padding:"6px 16px",borderRadius:7,fontSize:12,fontWeight:700,color:C.textDim,border:`1px solid ${C.border}`}}>Discard</div>
+          </div>
+        </div>
+      )}
+
+      {/* Prompt 6: name exists warning */}
+      {nameExistsWarn && (
+        <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"#E06060",color:"#fff",
+          padding:"10px 24px",borderRadius:10,fontSize:12,fontWeight:600,zIndex:9999,boxShadow:"0 4px 20px rgba(0,0,0,0.4)",
+          fontFamily:"'DM Sans',sans-serif",maxWidth:420,textAlign:"center"}}>{nameExistsWarn}</div>
+      )}
+
+      {/* Prompt 6: plan limit message */}
+      {planLimitMsg && (
+        <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"#E06060",color:"#fff",
+          padding:"10px 24px",borderRadius:10,fontSize:12,fontWeight:600,zIndex:9999,boxShadow:"0 4px 20px rgba(0,0,0,0.4)",
+          fontFamily:"'DM Sans',sans-serif",maxWidth:420,textAlign:"center"}}>{planLimitMsg}</div>
+      )}
+
+      {/* Prompt 7: delete confirmation modal */}
+      {deleteConfirm && (
+        <div style={{position:"fixed",inset:0,zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",
+          background:"rgba(0,0,0,0.6)",fontFamily:"'DM Sans',sans-serif"}}>
+          <div style={{background:dark?"#1A1A1A":"#fff",border:`1px solid ${C.border}`,borderRadius:14,
+            padding:"28px 32px",maxWidth:380,textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:C.text,letterSpacing:1,marginBottom:10}}>DELETE PLAN</div>
+            <div style={{fontSize:14,color:C.textMid,lineHeight:1.6,marginBottom:24}}>Delete this plan? This cannot be undone.</div>
+            <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+              <div className="btn" onClick={()=>setDeleteConfirm(null)}
+                style={{padding:"8px 24px",borderRadius:8,fontSize:13,fontWeight:700,color:C.textMid,border:`1px solid ${C.border}`}}>Cancel</div>
+              <div className="btn" onClick={()=>doDeleteSavedPlan(deleteConfirm)}
+                style={{padding:"8px 24px",borderRadius:8,fontSize:13,fontWeight:800,background:"#E06060",color:"#fff",border:"none"}}>Delete</div>
+            </div>
+          </div>
         </div>
       )}
     </div>
