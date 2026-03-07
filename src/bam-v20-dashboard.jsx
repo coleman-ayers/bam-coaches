@@ -6166,64 +6166,54 @@ export default function BAMFull(){
     if(showSignIn) return <SignInScreen onBack={()=>setShowSignIn(false)} onSuccess={(user)=>{setSbUser(user);setOnboarded(true);}}/>;
     if(!tourActive) return <OnboardingFlow
       onComplete={async(profileData)=>{
-        try{
-          const {data,error}=await supabase.auth.signUp({email:profileData.email,password:profileData.password});
-          if(error) throw error;
-          const user=data.user;
-          if(user){
-            setSbUser(user);
-            await supabase.from("profiles").upsert({
-              id:user.id,
-              first_name:profileData.firstName,
-              last_name:profileData.lastName,
-              country:profileData.country,
-              city:profileData.city,
-              roles:profileData.roles,
-              experience:profileData.experience,
-              age_groups:profileData.ageGroups,
-              separates:profileData.separates,
-              goal_1yr:profileData.goal1yr,
-              goal_10yr:profileData.goal10yr,
-              bio:profileData.bio,
-              photo_url:profileData.profilePhoto||null,
-            });
-            try{localStorage.setItem("onboardingComplete","true");localStorage.setItem("bam_auth_token","sb");}catch{}
-          }
-          setOnboarded(true);
-        }catch(e){
-          console.error("[BAM Signup Error]",e);
-          showApiError?.(e.message||"Sign up failed. Please try again.");
+        const {data,error}=await supabase.auth.signUp({email:profileData.email,password:profileData.password});
+        if(error) throw error;
+        const user=data.user;
+        if(user){
+          setSbUser(user);
+          await supabase.from("profiles").upsert({
+            id:user.id,
+            first_name:profileData.firstName,
+            last_name:profileData.lastName,
+            country:profileData.country,
+            city:profileData.city,
+            roles:profileData.roles,
+            experience:profileData.experience,
+            age_groups:profileData.ageGroups,
+            separates:profileData.separates,
+            goal_1yr:profileData.goal1yr,
+            goal_10yr:profileData.goal10yr,
+            bio:profileData.bio,
+            photo_url:profileData.profilePhoto||null,
+          });
+          try{localStorage.setItem("onboardingComplete","true");localStorage.setItem("bam_auth_token","sb");}catch{}
         }
+        setOnboarded(true);
       }}
       onTourStart={async(profileData)=>{
-        try{
-          const {data,error}=await supabase.auth.signUp({email:profileData.email,password:profileData.password});
-          if(error) throw error;
-          const user=data.user;
-          if(user){
-            setSbUser(user);
-            await supabase.from("profiles").upsert({
-              id:user.id,
-              first_name:profileData.firstName,
-              last_name:profileData.lastName,
-              country:profileData.country,
-              city:profileData.city,
-              roles:profileData.roles,
-              experience:profileData.experience,
-              age_groups:profileData.ageGroups,
-              separates:profileData.separates,
-              goal_1yr:profileData.goal1yr,
-              goal_10yr:profileData.goal10yr,
-              bio:profileData.bio,
-              photo_url:profileData.profilePhoto||null,
-            });
-            try{localStorage.setItem("onboardingComplete","true");localStorage.setItem("bam_auth_token","sb");}catch{}
-          }
-          setOnboarded(true);setTourActive(true);
-        }catch(e){
-          console.error("[BAM Signup Error]",e);
-          showApiError?.(e.message||"Sign up failed. Please try again.");
+        const {data,error}=await supabase.auth.signUp({email:profileData.email,password:profileData.password});
+        if(error) throw error;
+        const user=data.user;
+        if(user){
+          setSbUser(user);
+          await supabase.from("profiles").upsert({
+            id:user.id,
+            first_name:profileData.firstName,
+            last_name:profileData.lastName,
+            country:profileData.country,
+            city:profileData.city,
+            roles:profileData.roles,
+            experience:profileData.experience,
+            age_groups:profileData.ageGroups,
+            separates:profileData.separates,
+            goal_1yr:profileData.goal1yr,
+            goal_10yr:profileData.goal10yr,
+            bio:profileData.bio,
+            photo_url:profileData.profilePhoto||null,
+          });
+          try{localStorage.setItem("onboardingComplete","true");localStorage.setItem("bam_auth_token","sb");}catch{}
         }
+        setOnboarded(true);setTourActive(true);
       }}
       onSignIn={()=>setShowSignIn(true)}
     />;
