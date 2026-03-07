@@ -253,6 +253,7 @@ const css = `
 @keyframes pgIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
 @keyframes arrowFade{0%,100%{opacity:0;transform:translateX(-3px) rotate(-45deg);}50%{opacity:0.7;transform:translateX(2px) rotate(-45deg);}}
 @keyframes bamShimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+@keyframes bamFadeOut{0%,70%{opacity:1}100%{opacity:0}}
 @keyframes cardRadiate{0%,100%{box-shadow:0 4px 20px rgba(0,0,0,0.18),0 0 0 0 rgba(226,221,159,0);}50%{box-shadow:0 4px 20px rgba(0,0,0,0.18),0 0 0 7px rgba(226,221,159,0.07),0 0 0 14px rgba(226,221,159,0.03);}}
 .navCard{transition:transform 0.25s cubic-bezier(.34,1.56,.64,1);}
 .navCard:hover{transform:scale(1.04);}
@@ -4781,55 +4782,104 @@ function DashIntro({dark}){
 }
 
 // ── MY PROFILE PANEL ───────────────────────────────────────────────────────
-function MyProfilePanel({C, dark, onClose}){
+function MyProfilePanel({C, dark, onClose, profile, onProfileUpdate, photo, onPhotoUpdate}){
   const [editing, setEditing] = useState(false);
   const [photoHover, setPhotoHover] = useState(false);
-  const [profile, setProfile] = useState({
-    name:     "Coleman Ayers",
-    handle:   "@colemanayers",
-    role:     "Head Coach / Trainer",
-    org:      "By Any Means Basketball",
-    location: "Miami, FL",
-    bio:      "Building players from the inside out — skill, mindset, and culture. Founder of BAM Basketball.",
-    ig:       "byanymeans_bball",
-    x:        "colemanayers",
-    website:  "byanymeans.com",
-    certs:    ["BAM Certified Coach", "Level 3 — Advanced", "Max Plan Member"],
-  });
   const [draft, setDraft] = useState({...profile});
+  const [draftPhoto, setDraftPhoto] = useState(photo);
   const photoRef = useRef(null);
-  const [photoSrc, setPhotoSrc] = useState(null);
+  const [bioExpanded, setBioExpanded] = useState(false);
+  const [editErrors, setEditErrors] = useState({});
+  // Prompt 4: password change
+  const [pwModal, setPwModal] = useState(false);
+  const [pwForm, setPwForm] = useState({current:"",newPw:"",confirm:""});
+  const [pwErrors, setPwErrors] = useState({});
+  const [pwSuccess, setPwSuccess] = useState(false);
+  // Prompt 5: email change
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [emailDraft, setEmailDraft] = useState(profile.email||"");
+  const [emailError, setEmailError] = useState("");
+  const [emailSuccess, setEmailSuccess] = useState(false);
+  // Prompt 6: stats loading
+  const [profileStatsLoaded, setProfileStatsLoaded] = useState(false);
+  useEffect(()=>{const t=setTimeout(()=>setProfileStatsLoaded(true),1200);return()=>clearTimeout(t);},[]);
 
-  const save = () => { setProfile({...draft}); setEditing(false); };
-  const cancel = () => { setDraft({...profile}); setEditing(false); };
+  const initials = profile.name?.split(" ").map(w=>w[0]||"").join("").toUpperCase()||"";
+  const firstName = profile.name?.split(" ")[0]||"";
+  const lastName = profile.name?.split(" ").slice(1).join(" ")||"";
+
+  // Prompt 3: validation
+  const validate = () => {
+    const errs = {};
+    const parts = draft.name?.trim().split(/\s+/)||[];
+    if(!parts[0]) errs.firstName = "First name is required";
+    if(!parts.slice(1).join(" ").trim()) errs.lastName = "Last name is required";
+    if(!draft.location?.trim()) errs.location = "Location is required";
+    setEditErrors(errs);
+    return Object.keys(errs).length===0;
+  };
+
+  const save = () => {
+    if(!validate()) return;
+    onProfileUpdate({...draft, bio:draft.bio||""});
+    if(draftPhoto!==photo) onPhotoUpdate(draftPhoto);
+    try{localStorage.setItem("bam_user_name",draft.name?.split(" ")[0]||"Coach");}catch{}
+    setEditing(false); setEditErrors({});
+  };
+  const cancel = () => { setDraft({...profile}); setDraftPhoto(photo); setEditing(false); setEditErrors({}); };
 
   const handlePhoto = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => setPhotoSrc(ev.target.result);
+    reader.onload = (ev) => setDraftPhoto(ev.target.result);
     reader.readAsDataURL(file);
   };
 
-  const Field = ({label, field, multiline}) => editing ? (
-    multiline
-      ? <textarea value={draft[field]} onChange={e=>setDraft(p=>({...p,[field]:e.target.value}))}
-          style={{width:"100%",background:dark?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.05)",
-            border:`1px solid ${dark?"rgba(226,221,159,0.3)":GOLD+"60"}`,borderRadius:8,
-            padding:"9px 12px",fontSize:13,color:C.text,resize:"none",height:80,
-            fontFamily:"inherit",outline:"none",lineHeight:1.5,boxSizing:"border-box"}}/>
-      : <input value={draft[field]} onChange={e=>setDraft(p=>({...p,[field]:e.target.value}))}
-          style={{width:"100%",background:dark?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.05)",
-            border:`1px solid ${dark?"rgba(226,221,159,0.3)":GOLD+"60"}`,borderRadius:8,
-            padding:"8px 12px",fontSize:13,color:C.text,outline:"none",
-            fontFamily:"inherit",boxSizing:"border-box"}}/>
-  ) : null;
+  const inputStyle = (hasError) => ({
+    width:"100%",background:dark?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.05)",
+    border:`1px solid ${hasError?"#E06060":dark?"rgba(226,221,159,0.3)":GOLD+"60"}`,borderRadius:8,
+    padding:"8px 12px",fontSize:13,color:C.text,outline:"none",fontFamily:"inherit",boxSizing:"border-box"
+  });
+
+  // Prompt 4: password validation
+  const submitPw = () => {
+    const errs = {};
+    if(pwForm.current!==profile.password) errs.current = "Current password is incorrect";
+    if(pwForm.newPw.length<8) errs.newPw = "Password must be at least 8 characters";
+    if(pwForm.confirm!==pwForm.newPw) errs.confirm = "Passwords do not match";
+    setPwErrors(errs);
+    if(Object.keys(errs).length>0) return;
+    onProfileUpdate({...profile, password:pwForm.newPw});
+    setPwSuccess(true);
+    setTimeout(()=>{setPwModal(false);setPwSuccess(false);setPwForm({current:"",newPw:"",confirm:""});setPwErrors({});},1800);
+  };
+
+  // Prompt 5: email validation
+  const saveEmail = () => {
+    const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailDraft.trim());
+    if(!valid){ setEmailError("Please enter a valid email address"); return; }
+    setEmailError("");
+    onProfileUpdate({...profile, email:emailDraft.trim()});
+    setEditingEmail(false);
+    setEmailSuccess(true);
+    setTimeout(()=>setEmailSuccess(false),2000);
+  };
+
+  // Prompt 6: stats based on role
+  const roleStr = (profile.role||"").toLowerCase();
+  const showPlans = roleStr.includes("coach")||roleStr.includes("trainer")||!roleStr;
+  const profileStats = [
+    ["Content Views","142"],["Community Posts","24"],
+    ...(showPlans?[["Plans Created","7"]]:[] ),
+    ["Playbooks Created","3"],["Days Active","47"],
+  ];
 
   return (
     <div onClick={onClose}
       style={{position:"fixed",inset:0,zIndex:3000,background:"rgba(0,0,0,0.55)",backdropFilter:"blur(3px)"}}>
       <div onClick={e=>e.stopPropagation()}
-        style={{position:"absolute",right:0,top:0,bottom:0,width:400,
+        style={{position:"absolute",right:0,top:0,bottom:0,width:400,maxWidth:"100vw",
           background:dark?"#1E1E1E":"#fff",
           borderLeft:`1px solid ${dark?"#333":C.border}`,
           display:"flex",flexDirection:"column",
@@ -4841,12 +4891,12 @@ function MyProfilePanel({C, dark, onClose}){
           <div style={{fontSize:15,fontWeight:800,color:C.text}}>My Profile</div>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
             {!editing
-              ? <button onClick={()=>setEditing(true)} className="btn"
+              ? <button onClick={()=>{setDraft({...profile});setDraftPhoto(photo);setEditing(true);}} className="btn"
                   style={{fontSize:12,fontWeight:700,padding:"6px 14px",borderRadius:7,
                     background:dark?"rgba(226,221,159,0.12)":"rgba(0,0,0,0.06)",
                     border:`1px solid ${dark?"rgba(226,221,159,0.25)":C.border}`,
                     color:dark?GOLD:"#111",cursor:"pointer"}}>
-                  ✏️ Edit
+                  Edit
                 </button>
               : <>
                   <button onClick={cancel} className="btn"
@@ -4876,9 +4926,9 @@ function MyProfilePanel({C, dark, onClose}){
                 background:GOLD,display:"flex",alignItems:"center",justifyContent:"center",
                 fontSize:20,fontWeight:800,color:"#111",
                 boxShadow:`0 0 0 3px ${dark?"#1E1E1E":"#fff"}, 0 0 0 4px ${GOLD}55`}}>
-                {photoSrc
-                  ? <img src={photoSrc} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                  : "CA"}
+                {(editing?draftPhoto:photo)
+                  ? <img src={editing?draftPhoto:photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                  : initials}
               </div>
               {editing && (
                 <div onClick={()=>photoRef.current?.click()}
@@ -4893,64 +4943,103 @@ function MyProfilePanel({C, dark, onClose}){
                 background:"#5AB584",border:`2px solid ${dark?"#1E1E1E":"#fff"}`}}/>
             </div>
             <div style={{flex:1,minWidth:0}}>
-              {editing
-                ? <input value={draft.name} onChange={e=>setDraft(p=>({...p,name:e.target.value}))}
-                    style={{width:"100%",background:dark?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.05)",
-                      border:`1px solid ${dark?"rgba(226,221,159,0.3)":GOLD+"60"}`,borderRadius:8,
-                      padding:"7px 11px",fontSize:16,fontWeight:800,color:C.text,
-                      outline:"none",fontFamily:"inherit",marginBottom:6,boxSizing:"border-box"}}/>
-                : <div style={{fontSize:17,fontWeight:800,color:C.text,marginBottom:3}}>{profile.name}</div>
-              }
-              {editing
-                ? <input value={draft.handle} onChange={e=>setDraft(p=>({...p,handle:e.target.value}))}
-                    style={{width:"100%",background:dark?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.05)",
-                      border:`1px solid ${dark?"rgba(226,221,159,0.3)":GOLD+"60"}`,borderRadius:8,
-                      padding:"6px 11px",fontSize:12,color:C.textDim,outline:"none",
-                      fontFamily:"inherit",boxSizing:"border-box"}}/>
-                : <div style={{fontSize:12,color:GOLD,fontWeight:600}}>{profile.handle}</div>
-              }
+              {editing ? (
+                <div>
+                  <div style={{display:"flex",gap:6,marginBottom:4}}>
+                    <div style={{flex:1}}>
+                      <input value={draft.name?.split(" ")[0]||""} placeholder="First name"
+                        onChange={e=>{const last=draft.name?.split(" ").slice(1).join(" ")||"";setDraft(p=>({...p,name:(e.target.value+" "+last).trim()}));}}
+                        style={{...inputStyle(editErrors.firstName),fontSize:14,fontWeight:800}}/>
+                      {editErrors.firstName&&<div style={{fontSize:10,color:"#E06060",marginTop:2}}>{editErrors.firstName}</div>}
+                    </div>
+                    <div style={{flex:1}}>
+                      <input value={draft.name?.split(" ").slice(1).join(" ")||""} placeholder="Last name"
+                        onChange={e=>{const first=draft.name?.split(" ")[0]||"";setDraft(p=>({...p,name:(first+" "+e.target.value).trim()}));}}
+                        style={{...inputStyle(editErrors.lastName),fontSize:14,fontWeight:800}}/>
+                      {editErrors.lastName&&<div style={{fontSize:10,color:"#E06060",marginTop:2}}>{editErrors.lastName}</div>}
+                    </div>
+                  </div>
+                  <input value={draft.handle} onChange={e=>setDraft(p=>({...p,handle:e.target.value}))}
+                    style={{...inputStyle(false),fontSize:12,color:C.textDim,marginTop:4}}/>
+                </div>
+              ) : (
+                <>
+                  <div style={{fontSize:17,fontWeight:800,color:C.text,marginBottom:3}}>{profile.name}</div>
+                  <div style={{fontSize:12,color:GOLD,fontWeight:600}}>{profile.handle}</div>
+                </>
+              )}
             </div>
           </div>
 
           {/* Certs badges */}
           <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:22}}>
-            {profile.certs.map((c,i)=>(
+            {(profile.certs||[]).map((c,i)=>(
               <div key={i} style={{fontSize:10,fontWeight:700,padding:"4px 10px",borderRadius:20,
                 background:i===0?GOLD:dark?"rgba(226,221,159,0.1)":"rgba(0,0,0,0.06)",
-                color:i===0?"#111":dark?GOLD:GOLD,
+                color:i===0?"#111":GOLD,
                 border:i===0?"none":`1px solid ${dark?"rgba(226,221,159,0.25)":GOLD+"50"}`,
                 letterSpacing:.4}}>{c}</div>
             ))}
           </div>
 
-          {/* Fields */}
+          {/* Fields — Prompt 1: hide empty fields in view mode */}
           {[
             {label:"Role", field:"role"},
             {label:"Organization", field:"org"},
             {label:"Location", field:"location"},
-          ].map(({label,field})=>(
-            <div key={field} style={{marginBottom:14}}>
+          ].map(({label,field})=>{
+            if(!editing && !profile[field]) return null;
+            return (
+              <div key={field} style={{marginBottom:14}}>
+                <div style={{fontSize:10,fontWeight:700,color:dark?GOLD+"99":"#999",
+                  letterSpacing:1.2,textTransform:"uppercase",marginBottom:5}}>{label}</div>
+                {editing
+                  ? <div>
+                      <input value={draft[field]||""} onChange={e=>setDraft(p=>({...p,[field]:e.target.value}))}
+                        style={inputStyle(editErrors[field])}/>
+                      {editErrors[field]&&<div style={{fontSize:10,color:"#E06060",marginTop:2}}>{editErrors[field]}</div>}
+                    </div>
+                  : <div style={{fontSize:13,color:C.text,fontWeight:500}}>{profile[field]}</div>}
+              </div>
+            );
+          })}
+
+          {/* Bio — Prompt 1: truncate at 3 lines with Read more */}
+          {(editing || profile.bio) && (
+            <div style={{marginBottom:18}}>
               <div style={{fontSize:10,fontWeight:700,color:dark?GOLD+"99":"#999",
-                letterSpacing:1.2,textTransform:"uppercase",marginBottom:5}}>{label}</div>
-              {editing
-                ? <Field label={label} field={field}/>
-                : <div style={{fontSize:13,color:C.text,fontWeight:500}}>{profile[field]}</div>}
+                letterSpacing:1.2,textTransform:"uppercase",marginBottom:5}}>Bio</div>
+              {editing ? (
+                <div>
+                  <textarea value={draft.bio||""} onChange={e=>{if(e.target.value.length<=600)setDraft(p=>({...p,bio:e.target.value}));}}
+                    style={{width:"100%",background:dark?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.05)",
+                      border:`1px solid ${dark?"rgba(226,221,159,0.3)":GOLD+"60"}`,borderRadius:8,
+                      padding:"9px 12px",fontSize:13,color:C.text,resize:"none",height:80,
+                      fontFamily:"inherit",outline:"none",lineHeight:1.5,boxSizing:"border-box"}}/>
+                  <div style={{fontSize:10,color:(draft.bio||"").length>=580?"#E06060":C.textDim,textAlign:"right",marginTop:3}}>{(draft.bio||"").length}/600</div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{fontSize:13,color:C.textMid,lineHeight:1.6,
+                    ...(bioExpanded?{}:{display:"-webkit-box",WebkitLineClamp:3,WebkitBoxOrient:"vertical",overflow:"hidden"})}}>
+                    {profile.bio}
+                  </div>
+                  {profile.bio && profile.bio.length>120 && !bioExpanded && (
+                    <div onClick={()=>setBioExpanded(true)}
+                      style={{fontSize:12,color:GOLD,fontWeight:600,cursor:"pointer",marginTop:4}}>Read more</div>
+                  )}
+                  {bioExpanded && (
+                    <div onClick={()=>setBioExpanded(false)}
+                      style={{fontSize:12,color:GOLD,fontWeight:600,cursor:"pointer",marginTop:4}}>Show less</div>
+                  )}
+                </div>
+              )}
             </div>
-          ))}
+          )}
 
-          {/* Bio */}
-          <div style={{marginBottom:18}}>
-            <div style={{fontSize:10,fontWeight:700,color:dark?GOLD+"99":"#999",
-              letterSpacing:1.2,textTransform:"uppercase",marginBottom:5}}>Bio</div>
-            {editing
-              ? <Field label="Bio" field="bio" multiline/>
-              : <div style={{fontSize:13,color:C.textMid,lineHeight:1.6}}>{profile.bio}</div>}
-          </div>
-
-          {/* Divider */}
           <div style={{height:1,background:dark?"#2E2E2E":C.border,margin:"18px 0"}}/>
 
-          {/* Social links */}
+          {/* Social links — hide empty in view mode */}
           <div style={{marginBottom:6}}>
             <div style={{fontSize:10,fontWeight:700,color:dark?GOLD+"99":"#999",
               letterSpacing:1.2,textTransform:"uppercase",marginBottom:12}}>Socials</div>
@@ -4958,42 +5047,133 @@ function MyProfilePanel({C, dark, onClose}){
               {label:"Instagram", field:"ig",  icon:"📷", prefix:"@"},
               {label:"X",         field:"x",   icon:"𝕏",  prefix:"@"},
               {label:"Website",   field:"website", icon:"🌐", prefix:""},
-            ].map(({label,field,icon,prefix})=>(
-              <div key={field} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-                <span style={{fontSize:14,width:20,flexShrink:0}}>{icon}</span>
-                {editing
-                  ? <input value={draft[field]} onChange={e=>setDraft(p=>({...p,[field]:e.target.value}))}
-                      placeholder={label}
-                      style={{flex:1,background:dark?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.05)",
-                        border:`1px solid ${dark?"rgba(226,221,159,0.25)":C.border}`,borderRadius:7,
-                        padding:"7px 10px",fontSize:12,color:C.text,outline:"none",
-                        fontFamily:"inherit"}}/>
-                  : profile[field]
-                      ? <span style={{fontSize:13,color:dark?GOLD:GOLD,fontWeight:500}}>
-                          {prefix}{profile[field]}
-                        </span>
-                      : <span style={{fontSize:12,color:C.textDim,fontStyle:"italic"}}>Not set</span>
-                }
-              </div>
-            ))}
+            ].map(({label,field,icon,prefix})=>{
+              if(!editing && !profile[field]) return null;
+              return (
+                <div key={field} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                  <span style={{fontSize:14,width:20,flexShrink:0}}>{icon}</span>
+                  {editing
+                    ? <input value={draft[field]||""} onChange={e=>setDraft(p=>({...p,[field]:e.target.value}))}
+                        placeholder={label}
+                        style={{flex:1,background:dark?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.05)",
+                          border:`1px solid ${dark?"rgba(226,221,159,0.25)":C.border}`,borderRadius:7,
+                          padding:"7px 10px",fontSize:12,color:C.text,outline:"none",fontFamily:"inherit"}}/>
+                    : <span style={{fontSize:13,color:GOLD,fontWeight:500}}>{prefix}{profile[field]}</span>
+                  }
+                </div>
+              );
+            })}
           </div>
 
-          {/* Divider */}
           <div style={{height:1,background:dark?"#2E2E2E":C.border,margin:"18px 0"}}/>
 
-          {/* Stats strip */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            {[["Posts","24"],["Practice Plans","7"],["Comments","61"],["Time","14h"]].map(([l,v])=>(
-              <div key={l} style={{background:dark?"rgba(255,255,255,0.04)":"rgba(0,0,0,0.03)",
-                borderRadius:10,padding:"12px 14px",border:`1px solid ${dark?"#2A2A2A":C.border}`}}>
-                <div style={{fontSize:20,fontWeight:800,color:dark?GOLD:"#111",marginBottom:2}}>{v}</div>
-                <div style={{fontSize:10,color:C.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:.8}}>{l}</div>
-              </div>
-            ))}
+          {/* Prompt 6: Stats strip with shimmer */}
+          <div style={{marginBottom:18}}>
+            <div style={{fontSize:10,fontWeight:700,color:dark?GOLD+"99":"#999",
+              letterSpacing:1.2,textTransform:"uppercase",marginBottom:12}}>Stats</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              {profileStats.map(([l,v])=>(
+                <div key={l} style={{background:dark?"rgba(255,255,255,0.04)":"rgba(0,0,0,0.03)",
+                  borderRadius:10,padding:"12px 14px",border:`1px solid ${dark?"#2A2A2A":C.border}`}}>
+                  {profileStatsLoaded?(
+                    <div style={{fontSize:20,fontWeight:800,color:dark?GOLD:"#111",marginBottom:2}}>{v||"0"}</div>
+                  ):(
+                    <div style={{width:36,height:20,borderRadius:5,background:dark?"#333":"#e8e8e8",overflow:"hidden",position:"relative",marginBottom:2}}>
+                      <div style={{position:"absolute",inset:0,background:`linear-gradient(90deg,transparent,${dark?"rgba(255,255,255,0.06)":"rgba(255,255,255,0.7)"},transparent)`,animation:"bamShimmer 1.5s ease-in-out infinite"}}/>
+                    </div>
+                  )}
+                  <div style={{fontSize:10,color:C.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:.8}}>{l}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{height:1,background:dark?"#2E2E2E":C.border,margin:"18px 0"}}/>
+
+          {/* Prompt 4 & 5: Account section */}
+          <div>
+            <div style={{fontSize:10,fontWeight:700,color:dark?GOLD+"99":"#999",
+              letterSpacing:1.2,textTransform:"uppercase",marginBottom:12}}>Account</div>
+
+            {/* Email */}
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:10,fontWeight:600,color:C.textDim,marginBottom:5,textTransform:"uppercase",letterSpacing:.8}}>Email</div>
+              {editingEmail?(
+                <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
+                  <div style={{flex:1}}>
+                    <input value={emailDraft} onChange={e=>{setEmailDraft(e.target.value);setEmailError("");}}
+                      style={inputStyle(!!emailError)} autoFocus/>
+                    {emailError&&<div style={{fontSize:10,color:"#E06060",marginTop:2}}>{emailError}</div>}
+                  </div>
+                  <button onClick={saveEmail}
+                    style={{padding:"8px 14px",borderRadius:7,background:GOLD,border:"none",color:"#111",
+                      fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0}}>Save</button>
+                  <button onClick={()=>{setEditingEmail(false);setEmailDraft(profile.email||"");setEmailError("");}}
+                    style={{padding:"8px 10px",borderRadius:7,border:`1px solid ${dark?"#444":C.border}`,
+                      background:"transparent",color:C.textDim,fontSize:12,cursor:"pointer",flexShrink:0}}>×</button>
+                </div>
+              ):(
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:13,color:C.text}}>{profile.email||"Not set"}</span>
+                  <Pen size={12} color={C.textDim} style={{cursor:"pointer"}} onClick={()=>{setEmailDraft(profile.email||"");setEditingEmail(true);}}/>
+                  {emailSuccess&&<span style={{fontSize:11,color:GOLD,fontWeight:600,animation:"bamFadeOut 2s forwards"}}>Email updated</span>}
+                </div>
+              )}
+            </div>
+
+            {/* Change Password */}
+            <button onClick={()=>setPwModal(true)}
+              style={{padding:"10px 18px",borderRadius:9,border:`1px solid ${dark?"#444":C.border}`,
+                background:"transparent",color:C.text,fontSize:13,fontWeight:700,cursor:"pointer",width:"100%",textAlign:"left"}}>
+              Change Password
+            </button>
           </div>
 
         </div>
       </div>
+
+      {/* Prompt 4: Password change modal */}
+      {pwModal&&(
+        <div onClick={e=>e.stopPropagation()}
+          style={{position:"fixed",inset:0,zIndex:3500,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(2px)"}}>
+          <div style={{background:dark?"#1E1E1E":"#fff",borderRadius:14,padding:"28px 28px",width:360,maxWidth:"90vw",
+            border:`1px solid ${dark?"#333":C.border}`,boxShadow:`0 20px 60px rgba(0,0,0,0.5)`}}>
+            {pwSuccess?(
+              <div style={{textAlign:"center",padding:"20px 0"}}>
+                <div style={{fontSize:18,fontWeight:800,color:GOLD,marginBottom:8}}>Password updated successfully</div>
+              </div>
+            ):(
+              <>
+                <div style={{fontSize:16,fontWeight:800,color:C.text,marginBottom:20}}>Change Password</div>
+                {[
+                  {label:"Current Password",key:"current",err:pwErrors.current},
+                  {label:"New Password",key:"newPw",err:pwErrors.newPw},
+                  {label:"Confirm New Password",key:"confirm",err:pwErrors.confirm},
+                ].map(({label,key,err})=>(
+                  <div key={key} style={{marginBottom:14}}>
+                    <div style={{fontSize:11,fontWeight:600,color:C.textDim,marginBottom:4}}>{label}</div>
+                    <input type="password" value={pwForm[key]}
+                      onChange={e=>setPwForm(p=>({...p,[key]:e.target.value}))}
+                      style={{...inputStyle(!!err),width:"100%"}}/>
+                    {err&&<div style={{fontSize:10,color:"#E06060",marginTop:2}}>{err}</div>}
+                  </div>
+                ))}
+                <div style={{display:"flex",gap:8,marginTop:8}}>
+                  <button onClick={submitPw}
+                    style={{flex:1,padding:"10px",borderRadius:8,background:GOLD,border:"none",color:"#111",fontWeight:800,fontSize:13,cursor:"pointer"}}>
+                    Update Password
+                  </button>
+                  <button onClick={()=>{setPwModal(false);setPwForm({current:"",newPw:"",confirm:""});setPwErrors({});}}
+                    style={{padding:"10px 16px",borderRadius:8,border:`1px solid ${dark?"#444":C.border}`,
+                      background:"transparent",color:C.textDim,fontSize:13,cursor:"pointer"}}>
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -5389,14 +5569,25 @@ export default function BAMFull(){
   const ptsRef=useRef(null);
   const scrollRef=useRef(null);
   const [scrollY,setScrollY]=useState(0);
+  // Prompt 2: Lifted profile state for app-wide propagation
+  const [appProfile, setAppProfile] = useState({
+    name:"Coleman Ayers", handle:"@colemanayers", role:"Head Coach / Trainer",
+    org:"By Any Means Basketball", location:"Miami, FL",
+    bio:"Building players from the inside out — skill, mindset, and culture. Founder of BAM Basketball.",
+    ig:"byanymeans_bball", x:"colemanayers", website:"byanymeans.com",
+    email:"coleman@byanymeans.com", password:"password123",
+    certs:["BAM Certified Coach","Level 3 — Advanced","Max Plan Member"],
+  });
+  const [appPhoto, setAppPhoto] = useState(null);
+  const appFirstName = appProfile.name?.split(" ")[0] || "Coach";
+  const appInitials = appProfile.name?.split(" ").map(w=>w[0]||"").join("").toUpperCase()||"CA";
+
   // Prompt 1: greeting with user name
   const [userName, setUserName] = useState(null);
   useEffect(()=>{
-    const t=setTimeout(()=>{
-      try{ const n=localStorage.getItem("bam_user_name"); setUserName(n||"Coach"); }catch{ setUserName("Coach"); }
-    },600);
+    const t=setTimeout(()=>{ setUserName(appFirstName); },600);
     return ()=>clearTimeout(t);
-  },[]);
+  },[appFirstName]);
   const getGreeting=()=>{
     const h=new Date().getHours();
     if(h<12) return "Good morning";
@@ -5618,12 +5809,12 @@ export default function BAMFull(){
         </div>
         <div className="profile-row" onClick={()=>setMyProfileOpen(true)}
           style={{padding:"14px 16px",borderTop:`1px solid ${SBborder}`,display:"flex",alignItems:"center",gap:10,cursor:"pointer",transition:"background .2s"}}>
-          <div style={{width:34,height:34,borderRadius:"50%",background:GOLD,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:"#1A1A1A",flexShrink:0,position:"relative",boxShadow:`0 2px 10px ${GOLD}55`}}>
-            CA
+          <div style={{width:34,height:34,borderRadius:"50%",background:GOLD,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:"#1A1A1A",flexShrink:0,position:"relative",boxShadow:`0 2px 10px ${GOLD}55`,overflow:"hidden"}}>
+            {appPhoto?<img src={appPhoto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:appInitials}
             <div style={{position:"absolute",bottom:0,right:0,width:9,height:9,borderRadius:"50%",background:"#5AB584",border:`2px solid ${SBcard}`}}/>
           </div>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:14,fontWeight:700,color:SBtext,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>Coleman Ayers</div>
+            <div style={{fontSize:14,fontWeight:700,color:SBtext,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{appProfile.name}</div>
             <div style={{fontSize:11,color:SBdim}}>Admin · Max Plan</div>
           </div>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={SBdim} strokeWidth="2" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
@@ -6168,7 +6359,8 @@ export default function BAMFull(){
           )}
         </div>
       {profileName&&<ProfilePanel key={profileName} name={profileName} dark={dark} C={C} onClose={()=>setProfileName(null)}/>}
-      {myProfileOpen&&<MyProfilePanel C={C} dark={dark} onClose={()=>setMyProfileOpen(false)}/>}
+      {myProfileOpen&&<MyProfilePanel C={C} dark={dark} onClose={()=>setMyProfileOpen(false)}
+        profile={appProfile} onProfileUpdate={setAppProfile} photo={appPhoto} onPhotoUpdate={setAppPhoto}/>}
       {mapOpen&&<MemberMapOverlay C={C} dark={dark} onClose={()=>setMapOpen(false)} onProfileClick={(name)=>{setProfileName(name);setMapOpen(false);}}/>}
       {tourActive&&<TourOverlay onComplete={()=>setTourActive(false)} onNavigate={setNav}/>}
       </div>
