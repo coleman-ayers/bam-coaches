@@ -31,7 +31,7 @@ const hf = "'Bebas Neue',sans-serif";
 // ── MOCK DATA ──────────────────────────────────────────────────────────────
 
 const MOCK_MEMBERS = [
-  { id: 1, first: "Marcus", last: "Thompson", email: "marcus.t@email.com", country: "Canada", city: "Toronto", role: "Skills Trainer", experience: "5-10 years", joinDate: "2025-01-15", status: "active" },
+  { id: 1, first: "Marcus", last: "Thompson", email: "marcus.t@email.com", country: "Canada", city: "Toronto", role: "Skills Trainer", experience: "5-10 years", joinDate: "2025-01-15", status: "active", isAdmin: true },
   { id: 2, first: "James", last: "Okonkwo", email: "james.o@email.com", country: "Nigeria", city: "Lagos", role: "Academy Coach", experience: "10+ years", joinDate: "2025-01-22", status: "active" },
   { id: 3, first: "Sofia", last: "Rodriguez", email: "sofia.r@email.com", country: "Spain", city: "Barcelona", role: "Skills Trainer", experience: "5-10 years", joinDate: "2025-02-03", status: "active" },
   { id: 4, first: "Kwame", last: "Darko", email: "kwame.d@email.com", country: "Ghana", city: "Accra", role: "Academy Coach", experience: "3-5 years", joinDate: "2025-02-10", status: "active" },
@@ -160,19 +160,29 @@ function MembersTab({ C }) {
   const [msgModal, setMsgModal] = useState(null);
   const [msgText, setMsgText] = useState("");
   const [menuOpen, setMenuOpen] = useState(null);
+  const [csvError, setCsvError] = useState("");
 
   const countries = ["All", ...new Set(MOCK_MEMBERS.map(m => m.country))];
 
   const filtered = members.filter(m => {
-    if (search && !`${m.first} ${m.last} ${m.email}`.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search && !`${m.first || ""} ${m.last || ""} ${m.email || ""}`.toLowerCase().includes(search.toLowerCase())) return false;
     if (roleFilter !== "All" && m.role !== roleFilter) return false;
     if (countryFilter !== "All" && m.country !== countryFilter) return false;
     return true;
   });
 
+  const adminCount = members.filter(m => m.isAdmin && m.status === "active").length;
+  const isLastAdmin = (m) => m.isAdmin && adminCount <= 1 && m.status === "active";
+
   const exportCSV = () => {
+    if (filtered.length === 0) {
+      setCsvError("Must include at least one member to export");
+      setTimeout(() => setCsvError(""), 3000);
+      return;
+    }
+    setCsvError("");
     const headers = ["First Name", "Last Name", "Email", "Country", "City", "Role", "Experience", "Join Date", "Status"];
-    const rows = filtered.map(m => [m.first, m.last, m.email, m.country, m.city, m.role, m.experience, m.joinDate, m.status]);
+    const rows = filtered.map(m => [m.first || "", m.last || "", m.email || "", m.country || "", m.city || "", m.role || "", m.experience || "", m.joinDate || "", m.status || ""]);
     const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -190,7 +200,10 @@ function MembersTab({ C }) {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div style={{ fontFamily: hf, fontSize: 28, color: TEXT, letterSpacing: 2 }}>MEMBERS</div>
-        <button style={btnStyle(false)} onClick={exportCSV}><Download size={14} /> Export CSV</button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {csvError && <span style={{ fontSize: 12, color: "#E57373", fontWeight: 600 }}>{csvError}</span>}
+          <button style={btnStyle(false)} onClick={exportCSV}><Download size={14} /> Export CSV</button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -226,42 +239,58 @@ function MembersTab({ C }) {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(m => (
+              {filtered.length === 0 ? (
+                <tr><td colSpan={10} style={{ padding: "40px 0", textAlign: "center", fontSize: 14, color: DIM }}>No members found</td></tr>
+              ) : filtered.map(m => (
                 <tr key={m.id} style={{ borderBottom: `1px solid ${BORDER}` }}
                   onMouseEnter={e => e.currentTarget.style.background = hoverRow}
                   onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                  <td style={{ padding: "10px 14px" }}>{m.first}</td>
-                  <td style={{ padding: "10px 14px" }}>{m.last}</td>
-                  <td style={{ padding: "10px 14px", color: MID }}>{m.email}</td>
-                  <td style={{ padding: "10px 14px" }}>{m.country}</td>
-                  <td style={{ padding: "10px 14px" }}>{m.city}</td>
-                  <td style={{ padding: "10px 14px" }}><span style={{ fontSize: 11, fontWeight: 700, color: "#111", background: GOLD, padding: "3px 10px", borderRadius: 12 }}>{m.role}</span></td>
-                  <td style={{ padding: "10px 14px", color: MID }}>{m.experience}</td>
-                  <td style={{ padding: "10px 14px", color: MID }}>{m.joinDate}</td>
+                  <td style={{ padding: "10px 14px" }}>{m.first || ""}</td>
+                  <td style={{ padding: "10px 14px" }}>{m.last || ""}</td>
+                  <td style={{ padding: "10px 14px", color: MID }}>{m.email || ""}</td>
+                  <td style={{ padding: "10px 14px" }}>{m.country || ""}</td>
+                  <td style={{ padding: "10px 14px" }}>{m.city || ""}</td>
+                  <td style={{ padding: "10px 14px" }}>{m.role ? <span style={{ fontSize: 11, fontWeight: 700, color: "#111", background: GOLD, padding: "3px 10px", borderRadius: 12 }}>{m.role}</span> : ""}</td>
+                  <td style={{ padding: "10px 14px", color: MID }}>{m.experience || ""}</td>
+                  <td style={{ padding: "10px 14px", color: MID }}>{m.joinDate || ""}</td>
                   <td style={{ padding: "10px 14px" }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 12,
+                    {m.status ? <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 12,
                       background: m.status === "active" ? "rgba(90,181,132,0.15)" : "rgba(229,115,115,0.15)",
                       color: m.status === "active" ? "#5AB584" : "#E57373" }}>
                       {m.status}
-                    </span>
+                    </span> : ""}
                   </td>
                   <td style={{ padding: "10px 14px", position: "relative" }}>
                     <MoreVertical size={16} color={DIM} style={{ cursor: "pointer" }}
                       onClick={() => setMenuOpen(menuOpen === m.id ? null : m.id)} />
                     {menuOpen === m.id && (
                       <div style={{ position: "absolute", right: 14, top: 36, background: CARD, border: `1px solid ${BORDER}`, borderRadius: 8, zIndex: 10, minWidth: 160, boxShadow: "0 8px 24px rgba(0,0,0,0.6)" }}>
-                        <div style={{ padding: "10px 14px", fontSize: 13, color: TEXT, cursor: "pointer" }}
-                          onClick={() => { setMsgModal(m); setMenuOpen(null); }}
-                          onMouseEnter={e => e.currentTarget.style.background = hoverMenu}
-                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                          <Send size={12} style={{ marginRight: 8 }} />Send Message
-                        </div>
-                        <div style={{ padding: "10px 14px", fontSize: 13, color: m.status === "active" ? "#E57373" : "#5AB584", cursor: "pointer" }}
-                          onClick={() => toggleStatus(m.id)}
-                          onMouseEnter={e => e.currentTarget.style.background = hoverMenu}
-                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                          {m.status === "active" ? "Suspend" : "Reactivate"}
-                        </div>
+                        {m.status === "suspended" ? (
+                          <div style={{ padding: "10px 14px", fontSize: 13, color: DIM, cursor: "default", opacity: 0.5 }}
+                            title="User is suspended">
+                            <Send size={12} style={{ marginRight: 8 }} />Send Message
+                          </div>
+                        ) : (
+                          <div style={{ padding: "10px 14px", fontSize: 13, color: TEXT, cursor: "pointer" }}
+                            onClick={() => { setMsgModal(m); setMenuOpen(null); }}
+                            onMouseEnter={e => e.currentTarget.style.background = hoverMenu}
+                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                            <Send size={12} style={{ marginRight: 8 }} />Send Message
+                          </div>
+                        )}
+                        {isLastAdmin(m) ? (
+                          <div style={{ padding: "10px 14px", fontSize: 13, color: DIM, cursor: "default", opacity: 0.5 }}
+                            title="Cannot suspend the only admin account">
+                            Suspend
+                          </div>
+                        ) : (
+                          <div style={{ padding: "10px 14px", fontSize: 13, color: m.status === "active" ? "#E57373" : "#5AB584", cursor: "pointer" }}
+                            onClick={() => toggleStatus(m.id)}
+                            onMouseEnter={e => e.currentTarget.style.background = hoverMenu}
+                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                            {m.status === "active" ? "Suspend" : "Reactivate"}
+                          </div>
+                        )}
                       </div>
                     )}
                   </td>
@@ -294,7 +323,10 @@ function ContentManagerTab({ C }) {
   const { card: CARD, border: BORDER, text: TEXT, dim: DIM, mid: MID, inputBg } = C;
   const inputBase = mkInput(C), selectBase = mkSelect(C), cardStyle = mkCard(C);
   const [contentData, setContentData] = useState(() => {
-    // Pull initial content from the main app's CONTENT object
+    try {
+      const saved = JSON.parse(localStorage.getItem("bam_admin_content_order") || "null");
+      if (saved) return saved;
+    } catch {}
     const sections = {};
     CONTENT_SECTIONS.forEach(s => { sections[s.id] = []; });
     return sections;
@@ -303,47 +335,87 @@ function ContentManagerTab({ C }) {
   const [editItem, setEditItem] = useState(null);
   const [expandedSection, setExpandedSection] = useState("pd");
   const [dragItem, setDragItem] = useState(null);
+  const [formErrors, setFormErrors] = useState({});
+  const [dupeWarning, setDupeWarning] = useState(null);
+  const [muxError, setMuxError] = useState("");
 
   const [form, setForm] = useState({
     title: "", desc: "", keyPoints: [""], section: "pd", tags: [],
     level: "All Levels", duration: "", coach: "", muxId: "",
   });
 
-  const resetForm = () => setForm({ title: "", desc: "", keyPoints: [""], section: "pd", tags: [], level: "All Levels", duration: "", coach: "", muxId: "" });
+  // Persist content order to localStorage
+  const persistContent = (data) => {
+    setContentData(data);
+    try { localStorage.setItem("bam_admin_content_order", JSON.stringify(data)); } catch {}
+  };
+
+  const resetForm = () => { setForm({ title: "", desc: "", keyPoints: [""], section: "pd", tags: [], level: "All Levels", duration: "", coach: "", muxId: "" }); setFormErrors({}); setMuxError(""); };
 
   const openAdd = () => { resetForm(); setAddModal(true); setEditItem(null); };
   const openEdit = (section, item) => {
     setForm({ title: item.title, desc: item.desc || "", keyPoints: item.keyPoints || [""], section, tags: item.tag ? [item.tag] : [], level: item.level || "All Levels", duration: item.duration || "", coach: item.coach || "", muxId: item.muxId || "" });
     setEditItem({ section, id: item.id });
+    setFormErrors({});
+    setMuxError("");
     setAddModal(true);
   };
 
-  const saveContent = () => {
-    const newItem = { id: Date.now(), title: form.title, sub: form.tags[0] || "", desc: form.desc, keyPoints: form.keyPoints.filter(k => k.trim()), tag: form.tags[0] || "", level: form.level, duration: form.duration, coach: form.coach, coachInitials: form.coach.split(" ").map(w => w[0]).join(""), muxId: form.muxId, isNew: true };
-    if (editItem) {
-      setContentData(prev => ({ ...prev, [editItem.section]: prev[editItem.section].map(i => i.id === editItem.id ? { ...i, ...newItem, id: i.id } : i) }));
-    } else {
-      setContentData(prev => ({ ...prev, [form.section]: [...(prev[form.section] || []), newItem] }));
+  const validateMuxId = (id) => {
+    if (!id.trim()) return false;
+    // Mux IDs are alphanumeric with possible hyphens/underscores, typically 20+ chars
+    return /^[a-zA-Z0-9_-]{8,}$/.test(id.trim());
+  };
+
+  const attemptSave = () => {
+    const errors = {};
+    if (!form.title.trim()) errors.title = "Title is required";
+    if (!form.section) errors.section = "Section is required";
+    if (!form.muxId.trim()) errors.muxId = "Mux Video ID is required";
+    else if (!validateMuxId(form.muxId)) {
+      errors.muxId = "Incorrect video ID — please check your Mux dashboard";
     }
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    // Check for duplicate title in same section
+    const sectionItems = contentData[form.section] || [];
+    const hasDupe = sectionItems.some(i => i.title.toLowerCase() === form.title.trim().toLowerCase() && (!editItem || i.id !== editItem.id));
+    if (hasDupe && !dupeWarning) {
+      setDupeWarning(true);
+      return;
+    }
+
+    doSave();
+  };
+
+  const doSave = () => {
+    const newItem = { id: Date.now(), title: form.title.trim(), sub: form.tags[0] || "", desc: form.desc, keyPoints: form.keyPoints.filter(k => k.trim()), tag: form.tags[0] || "", level: form.level, duration: form.duration, coach: form.coach, coachInitials: form.coach.split(" ").map(w => w[0]).join(""), muxId: form.muxId.trim(), isNew: true };
+    let updated;
+    if (editItem) {
+      updated = { ...contentData, [editItem.section]: contentData[editItem.section].map(i => i.id === editItem.id ? { ...i, ...newItem, id: i.id } : i) };
+    } else {
+      updated = { ...contentData, [form.section]: [...(contentData[form.section] || []), newItem] };
+    }
+    persistContent(updated);
     setAddModal(false);
+    setDupeWarning(null);
     resetForm();
     setEditItem(null);
   };
 
   const deleteItem = (section, id) => {
-    setContentData(prev => ({ ...prev, [section]: prev[section].filter(i => i.id !== id) }));
+    persistContent({ ...contentData, [section]: contentData[section].filter(i => i.id !== id) });
   };
 
   const handleDragStart = (section, idx) => setDragItem({ section, idx });
   const handleDragOver = (e) => e.preventDefault();
   const handleDrop = (section, idx) => {
     if (!dragItem || dragItem.section !== section) return;
-    setContentData(prev => {
-      const items = [...prev[section]];
-      const [moved] = items.splice(dragItem.idx, 1);
-      items.splice(idx, 0, moved);
-      return { ...prev, [section]: items };
-    });
+    const items = [...contentData[section]];
+    const [moved] = items.splice(dragItem.idx, 1);
+    items.splice(idx, 0, moved);
+    persistContent({ ...contentData, [section]: items });
     setDragItem(null);
   };
 
@@ -392,11 +464,23 @@ function ContentManagerTab({ C }) {
 
       {/* Add/Edit Modal */}
       {addModal && (
-        <Modal title={editItem ? "Edit Content" : "Add Content"} onClose={() => { setAddModal(false); setEditItem(null); }} width={600} C={C}>
+        <Modal title={editItem ? "Edit Content" : "Add Content"} onClose={() => { setAddModal(false); setEditItem(null); setDupeWarning(null); }} width={600} C={C}>
+          {dupeWarning ? (
+            <div>
+              <div style={{ fontSize: 14, color: TEXT, lineHeight: 1.7, marginBottom: 20 }}>
+                A drill with this title already exists in this section — are you sure?
+              </div>
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                <button style={btnStyle(false)} onClick={() => setDupeWarning(null)}>Cancel</button>
+                <button style={btnStyle(true)} onClick={doSave}>Save Anyway</button>
+              </div>
+            </div>
+          ) : (
           <div style={{ display: "grid", gap: 14 }}>
             <div>
-              <label style={{ fontSize: 11, color: MID, display: "block", marginBottom: 4 }}>Title</label>
-              <input style={inputBase} value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+              <label style={{ fontSize: 11, color: MID, display: "block", marginBottom: 4 }}>Title *</label>
+              <input style={{ ...inputBase, borderColor: formErrors.title ? "#E57373" : C.border }} value={form.title} onChange={e => { setForm(f => ({ ...f, title: e.target.value })); setFormErrors(fe => ({ ...fe, title: undefined })); }} />
+              {formErrors.title && <div style={{ fontSize: 11, color: "#E57373", marginTop: 4 }}>{formErrors.title}</div>}
             </div>
             <div>
               <label style={{ fontSize: 11, color: MID, display: "block", marginBottom: 4 }}>Description</label>
@@ -419,13 +503,14 @@ function ContentManagerTab({ C }) {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div>
-                <label style={{ fontSize: 11, color: MID, display: "block", marginBottom: 4 }}>Section</label>
+                <label style={{ fontSize: 11, color: MID, display: "block", marginBottom: 4 }}>Section *</label>
                 <div style={{ position: "relative" }}>
-                  <select style={selectBase} value={form.section} onChange={e => setForm(f => ({ ...f, section: e.target.value }))}>
+                  <select style={{ ...selectBase, borderColor: formErrors.section ? "#E57373" : C.border }} value={form.section} onChange={e => { setForm(f => ({ ...f, section: e.target.value })); setFormErrors(fe => ({ ...fe, section: undefined })); }}>
                     {CONTENT_SECTIONS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                   </select>
                   <ChevronDown size={14} color={DIM} style={{ position: "absolute", right: 10, top: 13, pointerEvents: "none" }} />
                 </div>
+                {formErrors.section && <div style={{ fontSize: 11, color: "#E57373", marginTop: 4 }}>{formErrors.section}</div>}
               </div>
               <div>
                 <label style={{ fontSize: 11, color: MID, display: "block", marginBottom: 4 }}>Difficulty</label>
@@ -453,14 +538,16 @@ function ContentManagerTab({ C }) {
                 value={form.tags.join(", ")} onChange={e => setForm(f => ({ ...f, tags: e.target.value.split(",").map(t => t.trim()).filter(Boolean) }))} />
             </div>
             <div>
-              <label style={{ fontSize: 11, color: MID, display: "block", marginBottom: 4 }}>Mux Video ID (optional)</label>
-              <input style={inputBase} placeholder="Enter Mux video ID" value={form.muxId} onChange={e => setForm(f => ({ ...f, muxId: e.target.value }))} />
+              <label style={{ fontSize: 11, color: MID, display: "block", marginBottom: 4 }}>Mux Video ID *</label>
+              <input style={{ ...inputBase, borderColor: formErrors.muxId ? "#E57373" : C.border }} placeholder="Enter Mux video ID" value={form.muxId} onChange={e => { setForm(f => ({ ...f, muxId: e.target.value })); setFormErrors(fe => ({ ...fe, muxId: undefined })); }} />
+              {formErrors.muxId && <div style={{ fontSize: 11, color: "#E57373", marginTop: 4 }}>{formErrors.muxId}</div>}
             </div>
             <button style={{ ...btnStyle(true), justifyContent: "center", padding: "12px 0", marginTop: 8 }}
-              onClick={saveContent} disabled={!form.title.trim()}>
+              onClick={attemptSave}>
               <Check size={14} /> {editItem ? "Update" : "Add"} Content
             </button>
           </div>
+          )}
         </Modal>
       )}
     </div>
@@ -476,6 +563,7 @@ function AnnouncementsTab({ C }) {
   const [modal, setModal] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({ title: "", body: "", targetRole: "All", scheduledAt: "", pinned: false });
+  const [formErrors, setFormErrors] = useState({});
   const [now, setNow] = useState(Date.now());
 
   // Ad hoc calls
@@ -498,17 +586,33 @@ function AnnouncementsTab({ C }) {
 
   useEffect(() => { const i = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(i); }, []);
 
-  const resetForm = () => setForm({ title: "", body: "", targetRole: "All", scheduledAt: "", pinned: false });
+  const resetForm = () => { setForm({ title: "", body: "", targetRole: "All", scheduledAt: "", pinned: false }); setFormErrors({}); };
 
   const openNew = () => { resetForm(); setEditId(null); setModal(true); };
-  const openEdit = (a) => { setForm({ title: a.title, body: a.body, targetRole: a.targetRole, scheduledAt: a.scheduledAt, pinned: a.pinned }); setEditId(a.id); setModal(true); };
+  const openEdit = (a) => { setForm({ title: a.title, body: a.body, targetRole: a.targetRole, scheduledAt: a.scheduledAt, pinned: a.pinned }); setEditId(a.id); setFormErrors({}); setModal(true); };
 
   const save = () => {
-    const sent = new Date(form.scheduledAt).getTime() < now;
+    const errors = {};
+    if (!form.title.trim()) errors.title = "Title is required";
+    if (!form.body.trim()) errors.body = "Body is required";
+    if (form.scheduledAt && new Date(form.scheduledAt).getTime() < Date.now()) {
+      errors.scheduledAt = "Cannot schedule in the past";
+    }
+    // Check for same date/time conflict
+    if (form.scheduledAt) {
+      const conflict = announcements.find(a => a.scheduledAt === form.scheduledAt && a.id !== editId);
+      if (conflict) errors.scheduledAt = "Another announcement is already scheduled for this time";
+    }
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    // Default to All if no role selected
+    const targetRole = form.targetRole || "All";
+    const sent = form.scheduledAt ? new Date(form.scheduledAt).getTime() < now : false;
     if (editId) {
-      setAnnouncements(prev => prev.map(a => a.id === editId ? { ...a, ...form, sent } : a));
+      setAnnouncements(prev => prev.map(a => a.id === editId ? { ...a, ...form, targetRole, sent } : a));
     } else {
-      setAnnouncements(prev => [...prev, { ...form, id: Date.now(), sent }]);
+      setAnnouncements(prev => [...prev, { ...form, targetRole, id: Date.now(), sent }]);
     }
     setModal(false);
     resetForm();
@@ -555,8 +659,8 @@ function AnnouncementsTab({ C }) {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8, flexShrink: 0, marginLeft: 12 }}>
-                <Edit3 size={14} color={MID} style={{ cursor: "pointer" }} onClick={() => openEdit(a)} />
-                <Trash2 size={14} color="#E57373" style={{ cursor: "pointer" }} onClick={() => deleteAnn(a.id)} />
+                {!a.sent && <Edit3 size={14} color={MID} style={{ cursor: "pointer" }} onClick={() => openEdit(a)} />}
+                {!a.sent && <Trash2 size={14} color="#E57373" style={{ cursor: "pointer" }} onClick={() => deleteAnn(a.id)} />}
               </div>
             </div>
           </div>
@@ -567,12 +671,14 @@ function AnnouncementsTab({ C }) {
         <Modal title={editId ? "Edit Announcement" : "New Announcement"} onClose={() => { setModal(false); setEditId(null); }} C={C}>
           <div style={{ display: "grid", gap: 14 }}>
             <div>
-              <label style={{ fontSize: 11, color: MID, display: "block", marginBottom: 4 }}>Title</label>
-              <input style={inputBase} value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+              <label style={{ fontSize: 11, color: MID, display: "block", marginBottom: 4 }}>Title *</label>
+              <input style={{ ...inputBase, borderColor: formErrors.title ? "#E57373" : C.border }} value={form.title} onChange={e => { setForm(f => ({ ...f, title: e.target.value })); setFormErrors(fe => ({ ...fe, title: undefined })); }} />
+              {formErrors.title && <div style={{ fontSize: 11, color: "#E57373", marginTop: 4 }}>{formErrors.title}</div>}
             </div>
             <div>
-              <label style={{ fontSize: 11, color: MID, display: "block", marginBottom: 4 }}>Body</label>
-              <textarea style={{ ...inputBase, height: 100, resize: "vertical" }} value={form.body} onChange={e => setForm(f => ({ ...f, body: e.target.value }))} />
+              <label style={{ fontSize: 11, color: MID, display: "block", marginBottom: 4 }}>Body *</label>
+              <textarea style={{ ...inputBase, height: 100, resize: "vertical", borderColor: formErrors.body ? "#E57373" : C.border }} value={form.body} onChange={e => { setForm(f => ({ ...f, body: e.target.value })); setFormErrors(fe => ({ ...fe, body: undefined })); }} />
+              {formErrors.body && <div style={{ fontSize: 11, color: "#E57373", marginTop: 4 }}>{formErrors.body}</div>}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div>
@@ -586,16 +692,17 @@ function AnnouncementsTab({ C }) {
               </div>
               <div>
                 <label style={{ fontSize: 11, color: MID, display: "block", marginBottom: 4 }}>Schedule Date & Time</label>
-                <input type="datetime-local" style={inputBase} value={form.scheduledAt}
-                  onChange={e => setForm(f => ({ ...f, scheduledAt: e.target.value }))} />
+                <input type="datetime-local" style={{ ...inputBase, borderColor: formErrors.scheduledAt ? "#E57373" : C.border }} value={form.scheduledAt}
+                  onChange={e => { setForm(f => ({ ...f, scheduledAt: e.target.value })); setFormErrors(fe => ({ ...fe, scheduledAt: undefined })); }} />
+                {formErrors.scheduledAt && <div style={{ fontSize: 11, color: "#E57373", marginTop: 4 }}>{formErrors.scheduledAt}</div>}
               </div>
             </div>
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: TEXT, cursor: "pointer" }}>
               <input type="checkbox" checked={form.pinned} onChange={e => setForm(f => ({ ...f, pinned: e.target.checked }))} />
               Pin to top of community
             </label>
-            <button style={{ ...btnStyle(true), justifyContent: "center", padding: "12px 0", marginTop: 8 }}
-              onClick={save} disabled={!form.title.trim() || !form.scheduledAt}>
+            <button style={{ ...btnStyle(true), justifyContent: "center", padding: "12px 0", marginTop: 8, opacity: formErrors.scheduledAt ? 0.5 : 1 }}
+              onClick={save} disabled={!!formErrors.scheduledAt}>
               <Check size={14} /> {editId ? "Update" : "Schedule"} Announcement
             </button>
           </div>
@@ -739,7 +846,11 @@ function AnalyticsTab({ C }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12, marginBottom: 24 }}>
         {stats.map(s => (
           <div key={s.label} style={{ ...cardStyle, textAlign: "center", padding: "16px 12px" }}>
-            <div style={{ fontSize: 24, fontWeight: 800, color: GOLD, fontFamily: hf, letterSpacing: 1 }}>{s.value}</div>
+            {s.value === "0" || s.value === "0s" || s.value === "—" ? (
+              <div style={{ fontSize: 13, color: DIM, padding: "4px 0" }}>No data yet!</div>
+            ) : (
+              <div style={{ fontSize: 24, fontWeight: 800, color: GOLD, fontFamily: hf, letterSpacing: 1 }}>{s.value}</div>
+            )}
             <div style={{ fontSize: 10, color: DIM, marginTop: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>{s.label}</div>
           </div>
         ))}
@@ -761,7 +872,7 @@ function AnalyticsTab({ C }) {
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div style={{ fontSize: 13, color: DIM, padding: "40px 0", textAlign: "center" }}>No page view data yet</div>
+            <div style={{ fontSize: 13, color: DIM, padding: "40px 0", textAlign: "center" }}>No data yet!</div>
           )}
         </div>
 
@@ -781,7 +892,7 @@ function AnalyticsTab({ C }) {
               ))}
             </div>
           ) : (
-            <div style={{ fontSize: 13, color: DIM, padding: "40px 0", textAlign: "center" }}>No search data yet</div>
+            <div style={{ fontSize: 13, color: DIM, padding: "40px 0", textAlign: "center" }}>No data yet!</div>
           )}
         </div>
 
@@ -804,7 +915,7 @@ function AnalyticsTab({ C }) {
               ))}
             </div>
           ) : (
-            <div style={{ fontSize: 13, color: DIM, padding: "40px 0", textAlign: "center" }}>No saves yet</div>
+            <div style={{ fontSize: 13, color: DIM, padding: "40px 0", textAlign: "center" }}>No data yet!</div>
           )}
         </div>
 
@@ -847,6 +958,12 @@ function PlatformPreviewTab({ onExitAdmin, C }) {
   const { card: CARD, border: BORDER, text: TEXT, dim: DIM } = C;
   const selectBase = mkSelect(C), cardStyle = mkCard(C);
   const [previewRole, setPreviewRole] = useState("Skills Trainer");
+  const [previewKey, setPreviewKey] = useState(0);
+
+  const handleRoleChange = (e) => {
+    setPreviewRole(e.target.value);
+    setPreviewKey(k => k + 1); // Force full reset of preview area
+  };
 
   return (
     <div>
@@ -854,7 +971,7 @@ function PlatformPreviewTab({ onExitAdmin, C }) {
         <div style={{ fontFamily: hf, fontSize: 28, color: TEXT, letterSpacing: 2 }}>PLATFORM PREVIEW</div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <div style={{ position: "relative" }}>
-            <select value={previewRole} onChange={e => setPreviewRole(e.target.value)} style={{ ...selectBase, width: 180 }}>
+            <select value={previewRole} onChange={handleRoleChange} style={{ ...selectBase, width: 180 }}>
               {ROLES.filter(r => r !== "All").map(r => <option key={r}>{r}</option>)}
             </select>
             <ChevronDown size={14} color={DIM} style={{ position: "absolute", right: 10, top: 13, pointerEvents: "none" }} />
@@ -865,7 +982,7 @@ function PlatformPreviewTab({ onExitAdmin, C }) {
         </div>
       </div>
 
-      <div style={{ ...cardStyle, padding: 0, overflow: "hidden", borderRadius: 14 }}>
+      <div key={previewKey} style={{ ...cardStyle, padding: 0, overflow: "hidden", borderRadius: 14 }}>
         <div style={{ background: C.inputBg, padding: "10px 16px", fontSize: 11, color: DIM, display: "flex", alignItems: "center", gap: 8, borderBottom: `1px solid ${BORDER}` }}>
           <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#E57373" }} />
           <div style={{ width: 10, height: 10, borderRadius: "50%", background: GOLD }} />
@@ -901,6 +1018,53 @@ const ADMIN_TABS = [
 function AdminLayout({ user, onLogout, onExitAdmin, dark, toggleDark }) {
   const [tab, setTab] = useState("members");
   const C = dark ? DARK_ADMIN : LIGHT_ADMIN;
+
+  // Inactivity timeout: 60 min with 60s warning
+  const TIMEOUT_MS = 60 * 60 * 1000; // 60 minutes
+  const WARNING_MS = 59 * 60 * 1000; // warn at 59 minutes
+  const lastActivity = useRef(Date.now());
+  const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
+  const [timeoutCountdown, setTimeoutCountdown] = useState(60);
+  const warningTimer = useRef(null);
+  const logoutTimer = useRef(null);
+  const countdownInterval = useRef(null);
+
+  const resetInactivityTimers = useCallback(() => {
+    lastActivity.current = Date.now();
+    setShowTimeoutWarning(false);
+    setTimeoutCountdown(60);
+    clearTimeout(warningTimer.current);
+    clearTimeout(logoutTimer.current);
+    clearInterval(countdownInterval.current);
+    warningTimer.current = setTimeout(() => {
+      setShowTimeoutWarning(true);
+      setTimeoutCountdown(60);
+      countdownInterval.current = setInterval(() => {
+        setTimeoutCountdown(c => {
+          if (c <= 1) { clearInterval(countdownInterval.current); return 0; }
+          return c - 1;
+        });
+      }, 1000);
+    }, WARNING_MS);
+    logoutTimer.current = setTimeout(() => {
+      onLogout();
+    }, TIMEOUT_MS);
+  }, [onLogout]);
+
+  useEffect(() => {
+    resetInactivityTimers();
+    const events = ["mousemove", "click", "keydown", "scroll"];
+    const handler = () => {
+      if (!showTimeoutWarning) resetInactivityTimers();
+    };
+    events.forEach(e => window.addEventListener(e, handler));
+    return () => {
+      events.forEach(e => window.removeEventListener(e, handler));
+      clearTimeout(warningTimer.current);
+      clearTimeout(logoutTimer.current);
+      clearInterval(countdownInterval.current);
+    };
+  }, [resetInactivityTimers, showTimeoutWarning]);
 
   return (
     <div style={{ fontFamily: ff, background: C.bg, minHeight: "100vh", color: C.text, transition: "background .2s, color .2s" }}>
@@ -942,6 +1106,23 @@ function AdminLayout({ user, onLogout, onExitAdmin, dark, toggleDark }) {
         {tab === "analytics" && <AnalyticsTab C={C} />}
         {tab === "preview" && <PlatformPreviewTab onExitAdmin={onExitAdmin} C={C} />}
       </div>
+
+      {/* Inactivity timeout warning */}
+      {showTimeoutWarning && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: ff }}>
+          <div style={{ position: "absolute", inset: 0, background: C.modalBg }} />
+          <div style={{ ...mkCard(C), position: "relative", width: 420, textAlign: "center", zIndex: 1 }}>
+            <div style={{ fontFamily: hf, fontSize: 22, color: C.text, letterSpacing: 1, marginBottom: 12 }}>SESSION TIMEOUT</div>
+            <div style={{ fontSize: 14, color: C.mid, lineHeight: 1.7, marginBottom: 20 }}>
+              You'll be logged out in <strong style={{ color: GOLD }}>{timeoutCountdown} second{timeoutCountdown !== 1 ? "s" : ""}</strong> due to inactivity.
+            </div>
+            <button style={{ ...btnStyle(true), justifyContent: "center", padding: "10px 28px", margin: "0 auto" }}
+              onClick={resetInactivityTimers}>
+              Stay Logged In
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
