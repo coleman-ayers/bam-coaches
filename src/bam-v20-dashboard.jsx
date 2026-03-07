@@ -937,7 +937,7 @@ function PracticePlansPage({ C, dark }) {
       {/* Left sidebar — Block Palette */}
       <div style={{ width:210, borderRight:`1px solid ${C.border}`, display:"flex", flexDirection:"column", overflow:"hidden", flexShrink:0 }}>
         <div style={{ padding:"18px 14px 10px", borderBottom:`1px solid ${C.border}`, flexShrink:0 }}>
-          <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:18, color:GOLD, letterSpacing:1.5, marginBottom:2 }}>BLOCK PALETTE</div>
+          <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:18, color:GOLD, letterSpacing:1.5, marginBottom:2 }}>PRACTICE BUILDER</div>
           <div style={{ fontSize:10, color:C.textDim }}>Drag blocks onto your plan</div>
         </div>
         <div style={{ flex:1, overflowY:"auto", padding:"10px 10px 6px" }}>
@@ -2058,7 +2058,6 @@ function drawCourt(ctx, w, h, dark, igHandle, xHandle) {
     g.addColorStop(1,   "#363636");
     ctx.fillStyle = g;
   } else {
-    // Light maple — pale warm wood (matches clean diagram reference style)
     const g = ctx.createLinearGradient(0, 0, 0, h);
     g.addColorStop(0,   "#EDD9A3");
     g.addColorStop(0.35,"#E5CC8A");
@@ -2100,21 +2099,27 @@ function drawCourt(ctx, w, h, dark, igHandle, xHandle) {
   // ── Half-court line ───────────────────────────────────────────────────────
   ctx.beginPath(); ctx.moveTo(cx, p); ctx.lineTo(cx, h - p); ctx.stroke();
 
-  // ── Center circles ────────────────────────────────────────────────────────
+  // ── Center circle (outer 6ft radius) ──────────────────────────────────────
   const ccR = 6 * sy;
   ctx.beginPath(); ctx.arc(cx, cy, ccR, 0, Math.PI*2); ctx.stroke();
   // Inner tip-off circle (2ft radius)
   ctx.beginPath(); ctx.arc(cx, cy, 2 * sy, 0, Math.PI*2); ctx.stroke();
 
   // ── Reusable dimensions ────────────────────────────────────────────────────
-  const keyD  = 19 * sx;      // key depth (horizontal), ~130px
-  const keyW  = 16 * sy;      // key width (vertical), ~116px
-  const ftR   = 6  * sy;      // FT circle radius, ~44px
-  const raR   = 4  * sy;      // restricted area radius, ~29px
-  const bkD   = 5.25 * sx;    // basket depth from baseline, ~36px
-  const bbW   = 6  * sy;      // backboard width (±3ft), ~44px total
-  const threeR = 23.75 * sx;  // 3pt radius, ~163px
-  const cDist  = 22  * sy;    // 3pt corner y-distance from basket center
+  const keyD  = 19 * sx;      // key depth (baseline to FT line)
+  const keyW  = 16 * sy;      // key width (lane width)
+  const ftR   = 6  * sy;      // FT circle radius
+  const raR   = 4  * sy;      // restricted area radius
+  const bkD   = 5.25 * sx;    // basket depth from baseline
+  const bbW   = 6  * sy;      // backboard half-width (3ft each side)
+  const threeR = 23.75 * sx;  // 3pt arc radius
+  const cDist  = 22  * sy;    // 3pt corner distance from basket center
+
+  // Lane space marks — 4 marks on each side of the key, measured from baseline
+  // NBA: marks at 7ft, 8ft, 11ft, 14ft from baseline (1ft wide each)
+  const laneMarks = [7, 8, 11, 14];
+  const laneMarkW = 1 * sx;   // mark width (1ft)
+  const laneTickLen = 6;       // tick length in pixels
 
   const drawHalf = (left) => {
     const sign = left ? 1 : -1;
@@ -2125,23 +2130,39 @@ function drawCourt(ctx, w, h, dark, igHandle, xHandle) {
     // ── Key / Paint box ────────────────────────────────────────────────────
     ctx.strokeRect(kx, cy - keyW/2, keyD, keyW);
 
-    // ── Hash marks along key top/bottom ───────────────────────────────────
+    // ── Lane space marks (hash marks on key sides) ─────────────────────────
     ctx.lineWidth = 1.5;
-    [0.25, 0.5, 0.75].forEach(f => {
-      const hx = left ? p + keyD*f : w - p - keyD*f;
-      ctx.beginPath(); ctx.moveTo(hx, cy - keyW/2); ctx.lineTo(hx, cy - keyW/2 + 6); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(hx, cy + keyW/2); ctx.lineTo(hx, cy + keyW/2 - 6); ctx.stroke();
+    laneMarks.forEach(ft => {
+      const mx = left ? p + ft * sx : w - p - ft * sx;
+      const mx2 = left ? mx + laneMarkW : mx - laneMarkW;
+      // Top side
+      ctx.beginPath(); ctx.moveTo(mx, cy - keyW/2 - laneTickLen); ctx.lineTo(mx, cy - keyW/2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(mx2, cy - keyW/2 - laneTickLen); ctx.lineTo(mx2, cy - keyW/2); ctx.stroke();
+      // Bottom side
+      ctx.beginPath(); ctx.moveTo(mx, cy + keyW/2); ctx.lineTo(mx, cy + keyW/2 + laneTickLen); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(mx2, cy + keyW/2); ctx.lineTo(mx2, cy + keyW/2 + laneTickLen); ctx.stroke();
     });
 
-    // ── Lane side marks (outside the FT circle, pointing inward) ─────────
-    const ftEdgeX = left ? p + keyD : w - p - keyD;
-    [-0.3, -0.1, 0.1, 0.3].forEach(f => {
-      const my = cy + f * keyW;
-      ctx.beginPath();
-      ctx.moveTo(ftEdgeX, my);
-      ctx.lineTo(ftEdgeX + sign * 8, my);
-      ctx.stroke();
-    });
+    // ── Dashed lane lines inside paint ─────────────────────────────────────
+    // Two dashed lines running from baseline to FT line, 2ft inside each lane edge
+    ctx.save();
+    ctx.setLineDash([6, 5]);
+    ctx.lineWidth = 1.2;
+    const innerLaneOffset = 2 * sy; // 2ft inward from lane edge
+    const laneStartX = left ? p : w - p;
+    const laneEndX = left ? p + keyD : w - p - keyD;
+    // Top inner dashed line
+    ctx.beginPath();
+    ctx.moveTo(laneStartX, cy - keyW/2 + innerLaneOffset);
+    ctx.lineTo(laneEndX, cy - keyW/2 + innerLaneOffset);
+    ctx.stroke();
+    // Bottom inner dashed line
+    ctx.beginPath();
+    ctx.moveTo(laneStartX, cy + keyW/2 - innerLaneOffset);
+    ctx.lineTo(laneEndX, cy + keyW/2 - innerLaneOffset);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
     ctx.lineWidth = 1.8;
 
     // ── FT circle: solid inside key, dashed outside ───────────────────────
@@ -2161,32 +2182,39 @@ function drawCourt(ctx, w, h, dark, igHandle, xHandle) {
     ctx.setLineDash([]);
     ctx.restore();
 
-    // ── Restricted area arc (inside key, toward baseline) ─────────────────
+    // ── Restricted area arc ───────────────────────────────────────────────
     ctx.beginPath();
-    if (left) ctx.arc(bx, cy, raR, Math.PI/2, Math.PI*1.5);
-    else       ctx.arc(bx, cy, raR, -Math.PI/2, Math.PI/2);
+    if (left) {
+      ctx.arc(bx, cy, raR, Math.PI/2, Math.PI*1.5);
+      // Connect arc ends to baseline with straight lines
+      ctx.moveTo(bx, cy - raR); ctx.lineTo(base, cy - raR);
+      ctx.moveTo(bx, cy + raR); ctx.lineTo(base, cy + raR);
+    } else {
+      ctx.arc(bx, cy, raR, -Math.PI/2, Math.PI/2);
+      ctx.moveTo(bx, cy - raR); ctx.lineTo(base, cy - raR);
+      ctx.moveTo(bx, cy + raR); ctx.lineTo(base, cy + raR);
+    }
     ctx.stroke();
 
     // ── Backboard + rim ───────────────────────────────────────────────────
-    // Backboard: 6ft wide (±3ft from center)
     ctx.lineWidth = 3;
-    const bbX = left ? p + 3 : w - p - 3;
+    const bbX = left ? p + 4 * sx : w - p - 4 * sx;
     ctx.beginPath();
     ctx.moveTo(bbX, cy - bbW/2);
     ctx.lineTo(bbX, cy + bbW/2);
     ctx.stroke();
     ctx.lineWidth = 1.8;
-    // Rim tick (small perpendicular)
+
+    // Rim circle (9in radius = 0.75ft)
+    const rimX = left ? p + bkD : w - p - bkD;
     ctx.beginPath();
-    ctx.moveTo(bbX, cy - 1.5*sy);
-    ctx.lineTo(bbX + sign*3*sx, cy - 1.5*sy);
-    ctx.moveTo(bbX, cy + 1.5*sy);
-    ctx.lineTo(bbX + sign*3*sx, cy + 1.5*sy);
+    ctx.arc(rimX, cy, 0.75 * sy, 0, Math.PI * 2);
     ctx.stroke();
 
     // ── 3-point line ──────────────────────────────────────────────────────
     const arcJoinX = bx + sign * Math.sqrt(threeR*threeR - cDist*cDist);
 
+    // Corner straight sections
     ctx.beginPath();
     ctx.moveTo(base, cy - cDist);
     ctx.lineTo(arcJoinX, cy - cDist);
@@ -2196,14 +2224,28 @@ function drawCourt(ctx, w, h, dark, igHandle, xHandle) {
     ctx.lineTo(arcJoinX, cy + cDist);
     ctx.stroke();
 
-    // Arc sweeps around the BASELINE side (away from mid-court)
-    // LEFT basket (left=true):  clockwise  from topAngle(-79°) to botAngle(+79°)  → passes through 180°
-    // RIGHT basket (left=false): anticlockwise from topAngle(-101°) to botAngle(+101°) → passes through 0°
+    // Arc
     const topAngle = Math.atan2(-cDist, arcJoinX - bx);
     const botAngle = Math.atan2(+cDist, arcJoinX - bx);
     ctx.beginPath();
-    ctx.arc(bx, cy, threeR, topAngle, botAngle, left); // left→CCW through 180°, right→CW through 0°
+    ctx.arc(bx, cy, threeR, topAngle, botAngle, left);
     ctx.stroke();
+
+    // ── Corner baseline marks ──────────────────────────────────────────────
+    // Small tick marks where 3pt line meets the baseline
+    ctx.lineWidth = 1.5;
+    const cornerTickLen = 4;
+    // Top corner
+    ctx.beginPath();
+    ctx.moveTo(base, cy - cDist - cornerTickLen);
+    ctx.lineTo(base, cy - cDist + cornerTickLen);
+    ctx.stroke();
+    // Bottom corner
+    ctx.beginPath();
+    ctx.moveTo(base, cy + cDist - cornerTickLen);
+    ctx.lineTo(base, cy + cDist + cornerTickLen);
+    ctx.stroke();
+    ctx.lineWidth = 1.8;
   };
 
   drawHalf(true);
@@ -2213,15 +2255,15 @@ function drawCourt(ctx, w, h, dark, igHandle, xHandle) {
   ctx.save();
   ctx.translate(cx, cy);
 
-  // Dark circle behind logo
-  ctx.beginPath(); ctx.arc(0, 0, ccR * 0.85, 0, Math.PI*2);
-  ctx.fillStyle = dark ? "rgba(0,0,0,0.35)" : "rgba(0,0,0,0.12)";
+  // Subtle circle fill behind logo
+  ctx.beginPath(); ctx.arc(0, 0, ccR * 0.82, 0, Math.PI*2);
+  ctx.fillStyle = dark ? "rgba(0,0,0,0.35)" : "rgba(0,0,0,0.10)";
   ctx.fill();
 
-  // Draw pre-loaded microscope image (set on canvas data-* or global)
+  // Draw pre-loaded microscope image centered in the circle
   if (MICRO_LOADED || MICRO_IMG.complete) {
-    const ms = ccR * 1.6;
-    ctx.drawImage(MICRO_IMG, -ms * 0.48, -ms * 0.58, ms * 0.88, ms * 1.1);
+    const ms = ccR * 1.4;
+    ctx.drawImage(MICRO_IMG, -ms / 2, -ms / 2, ms, ms);
   }
 
   ctx.restore();
