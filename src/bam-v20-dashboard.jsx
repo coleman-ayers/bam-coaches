@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { LayoutDashboard, Users, Target, Megaphone, Brain, Lightbulb, Clipboard, FileText, Zap, GraduationCap, Play, Clock, ChevronLeft, Share2, Lock, CheckCircle, Filter, X, BookOpen, Pen, Trash2, Download, Globe2, ExternalLink, Headphones, BookMarked, Sparkles, ChevronDown, Library, Video, CalendarDays, GripVertical, Plus, ChevronUp, ChevronRight, Save, Type } from "lucide-react";
 
 const LOGO = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='40'%3E%3Ctext x='17' y='28' font-family='sans-serif' font-size='13' font-weight='900' fill='%23E2DD9F' text-anchor='middle'%3EBAM%3C/text%3E%3C/svg%3E";
@@ -295,12 +295,19 @@ const css = `
 .pp-drill-item{transition:transform .15s ease,box-shadow .15s ease,opacity .15s ease;}
 .pp-drill-item:hover{transform:scale(1.01);}
 .pp-drill-item.dragging{opacity:.3;transform:scale(.95);}
+@keyframes bamPageFade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+@keyframes bamSlideIn{from{transform:translateX(-100%);}to{transform:translateX(0);}}
+@keyframes bamSlideOut{from{transform:translateX(0);}to{transform:translateX(-100%);}}
 @media(max-width:700px){
   .bam-dash-cards{grid-template-columns:repeat(2,1fr)!important;}
   .bam-dash-bottom{grid-template-columns:1fr!important;}
   .bam-dash-bottom>div:last-child{order:-1;}
   .bam-dash-grid{grid-template-columns:1fr!important;}
   .bam-settings-row{min-height:44px!important;}
+  .bam-sidebar{display:none!important;}
+  .bam-sidebar-mobile{display:flex!important;}
+  .bam-hamburger{display:flex!important;}
+  .bam-topbar-search{display:none!important;}
 }
 @media(max-width:480px){
   .bam-dash-cards{grid-template-columns:1fr!important;}
@@ -5693,6 +5700,29 @@ function SettingsPage({C,dark,toggleDark,notifs,updateNotif,tz,updateTz,mapVisib
   );
 }
 
+// Prompt 6: Error boundary
+class BAMErrorBoundary extends React.Component{
+  constructor(p){super(p);this.state={hasError:false,error:null};}
+  static getDerivedStateFromError(e){return{hasError:true,error:e};}
+  componentDidCatch(e,info){console.error("[BAM Error Boundary]",e,info);}
+  render(){if(this.state.hasError)return(
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100%",padding:40,textAlign:"center",background:"#111",color:"#ccc",fontFamily:"'DM Sans',sans-serif"}}>
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#E2DD9F" strokeWidth="1.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+      <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:28,color:"#E2DD9F",letterSpacing:3,marginTop:16}}>SOMETHING WENT WRONG</div>
+      <div style={{fontSize:14,color:"#999",marginTop:8,maxWidth:340,lineHeight:1.6}}>An unexpected error occurred. Try refreshing the page.</div>
+      <button onClick={()=>this.setState({hasError:false,error:null})} style={{marginTop:20,padding:"10px 28px",borderRadius:8,fontSize:14,fontWeight:800,background:"#E2DD9F",color:"#111",border:"none",cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1}}>Try Again</button>
+    </div>
+  );return this.props.children;}
+}
+
+// Prompt 9: localStorage version
+const BAM_LS_VERSION="1.0.0";
+const BAM_LS_KEYS=["bam_dark_mode","bam_settings_notifs","bam_settings_tz","bam_map_visible","bam_dismissed_banners","bam_watched_ids","bam_fav_drills","bam_dismissed_ann","bam_expand_modules","onboardingComplete","bam_ls_version"];
+(function bamLsCleanup(){try{const v=localStorage.getItem("bam_ls_version");if(v&&v!==BAM_LS_VERSION){const keys=Object.keys(localStorage);keys.forEach(k=>{if(k.startsWith("bam_")&&!BAM_LS_KEYS.includes(k))localStorage.removeItem(k);});localStorage.setItem("bam_ls_version",BAM_LS_VERSION);}else if(!v){localStorage.setItem("bam_ls_version",BAM_LS_VERSION);}}catch{}})();
+
+// Prompt 10: Mobile Safari viewport fix
+(function bamViewportFix(){if(typeof window==="undefined")return;const set=()=>document.documentElement.style.setProperty("--app-height",window.innerHeight+"px");set();window.addEventListener("resize",set);})();
+
 export default function BAMFull(){
   const [onboarded,setOnboarded]=useState(()=>{
     try{ return localStorage.getItem("onboardingComplete")==="true"; }catch(e){ return false; }
@@ -5729,8 +5759,44 @@ export default function BAMFull(){
       return ()=>clearTimeout(t);
     }
   },[dashIntro]);
-  const [nav,setNav]=useState("dashboard");
+  // Prompt 1: hash-based routing
+  const parseHash=()=>{const h=window.location.hash.replace(/^#\/?/,"");return h||"dashboard";};
+  const [nav,setNav]=useState(parseHash);
   const [pageKey,setPageKey]=useState(0);
+  useEffect(()=>{
+    const onHash=()=>{const h=parseHash();setNav(h);setPageKey(k=>k+1);};
+    window.addEventListener("hashchange",onHash);
+    return ()=>window.removeEventListener("hashchange",onHash);
+  },[]);
+  // Prompt 2: mobile sidebar
+  const [mobileMenuOpen,setMobileMenuOpen]=useState(false);
+  // Prompt 3: page transition
+  const [pageFade,setPageFade]=useState(true);
+  useEffect(()=>{setPageFade(false);const t=requestAnimationFrame(()=>setPageFade(true));return ()=>cancelAnimationFrame(t);},[pageKey]);
+  // Prompt 8: offline detection
+  const [isOffline,setIsOffline]=useState(!navigator.onLine);
+  const [backOnline,setBackOnline]=useState(false);
+  useEffect(()=>{
+    const goOff=()=>setIsOffline(true);
+    const goOn=()=>{setIsOffline(false);setBackOnline(true);setTimeout(()=>setBackOnline(false),3000);};
+    window.addEventListener("offline",goOff);window.addEventListener("online",goOn);
+    return ()=>{window.removeEventListener("offline",goOff);window.removeEventListener("online",goOn);};
+  },[]);
+  // Prompt 5: multi-tab logout sync
+  useEffect(()=>{
+    const onStorage=(e)=>{if(e.key==="bam_auth_token"&&!e.newValue){window.location.href="https://byanymeansbball.com/platform";}};
+    window.addEventListener("storage",onStorage);
+    return ()=>window.removeEventListener("storage",onStorage);
+  },[]);
+  // Prompt 7: API error toast
+  const [apiError,setApiError]=useState(null);
+  const apiErrorTimer=useRef(null);
+  const showApiError=useCallback((msg)=>{
+    console.error("[BAM API Error]",msg);
+    setApiError(msg);
+    if(apiErrorTimer.current)clearTimeout(apiErrorTimer.current);
+    apiErrorTimer.current=setTimeout(()=>setApiError(null),5000);
+  },[]);
   const [notifOn,setNotifOn]=useState(true);
   const [notif,setNotif]=useState(null);
   const [pIdx,setPIdx]=useState(0);
@@ -5874,7 +5940,7 @@ export default function BAMFull(){
     return ()=>clearInterval(iv);
   },[]);
 
-  const go=(id)=>{ if(id===nav) return; setNav(id); setPageKey(k=>k+1); setPtsVis(false); setActiveTag("All"); logEvent("page_view",{page:id}); };
+  const go=(id)=>{ if(id===nav){setMobileMenuOpen(false);return;} window.location.hash="#/"+id; setPtsVis(false); setActiveTag("All"); setMobileMenuOpen(false); logEvent("page_view",{page:id}); };
   const cyclePrompt=()=>{ setPVis(false); setTimeout(()=>{ setPIdx(i=>(i+1)%PROMPTS.length); setPVis(true); },360); };
 
   const NAV_SECTIONS = [
@@ -5902,11 +5968,43 @@ export default function BAMFull(){
     </div>
   );
 
-  if(!onboarded&&!tourActive) return <OnboardingFlow onComplete={()=>setOnboarded(true)} onTourStart={()=>{setOnboarded(true);setTourActive(true);}}/>;
+  // Prompt 4: unauthenticated access interstitial
+  const [authChecked]=useState(()=>{try{return !!localStorage.getItem("bam_auth_token")||!!localStorage.getItem("onboardingComplete");}catch{return false;}});
+  if(!authChecked&&!onboarded) return (
+    <div style={{fontFamily:"'DM Sans',sans-serif",background:"#111",height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,color:"#ccc"}}>
+      <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:32,color:GOLD,letterSpacing:4}}>BY ANY MEANS</div>
+      <div style={{fontSize:14,color:"#999",maxWidth:320,textAlign:"center",lineHeight:1.6}}>You need to be logged in to access the coaches platform.</div>
+      <a href="https://byanymeansbball.com/platform" style={{marginTop:12,padding:"12px 32px",borderRadius:8,fontSize:14,fontWeight:800,background:GOLD,color:"#111",textDecoration:"none",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1}}>Go to Platform</a>
+    </div>
+  );
+
+  if(!onboarded&&!tourActive) return <OnboardingFlow onComplete={()=>{setOnboarded(true);try{localStorage.setItem("bam_auth_token","demo");}catch{}}} onTourStart={()=>{setOnboarded(true);setTourActive(true);try{localStorage.setItem("bam_auth_token","demo");}catch{}}}/>;
 
   return (
-    <div style={{fontFamily:"'DM Sans',sans-serif",background:C.bg,height:"100vh",display:"flex",color:C.text,transition:"background .3s,color .3s",overflow:"hidden"}}>
+    <div style={{fontFamily:"'DM Sans',sans-serif",background:C.bg,height:"var(--app-height,100vh)",display:"flex",color:C.text,transition:"background .3s,color .3s",overflow:"hidden"}}>
       <style>{css}</style>
+
+      {/* Prompt 8: offline banner */}
+      {isOffline&&(
+        <div style={{position:"fixed",top:0,left:0,right:0,zIndex:10000,background:GOLD,color:"#111",padding:"8px 0",textAlign:"center",fontSize:13,fontWeight:700,letterSpacing:.5,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2" strokeLinecap="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.56 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+          You're offline — some features may be unavailable
+        </div>
+      )}
+      {backOnline&&!isOffline&&(
+        <div style={{position:"fixed",top:0,left:0,right:0,zIndex:10000,background:"#5AB584",color:"#fff",padding:"8px 0",textAlign:"center",fontSize:13,fontWeight:700,letterSpacing:.5,animation:"bamFadeOut 3s ease forwards"}}>
+          Back online
+        </div>
+      )}
+
+      {/* Prompt 7: API error toast */}
+      {apiError&&(
+        <div style={{position:"fixed",bottom:24,right:24,zIndex:10001,background:"#1A1A1A",border:`1px solid #E0606080`,borderRadius:10,padding:"12px 20px",fontSize:13,color:"#E06060",display:"flex",alignItems:"center",gap:10,boxShadow:"0 8px 28px rgba(0,0,0,0.5)",animation:"slideD .3s ease",maxWidth:360}}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E06060" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+          <span style={{flex:1}}>{apiError}</span>
+          <span onClick={()=>setApiError(null)} style={{cursor:"pointer",color:"#999",fontSize:16,lineHeight:1}}>×</span>
+        </div>
+      )}
 
       {notif&&notifOn&&(
         <div style={{position:"fixed",top:14,left:"50%",zIndex:9999,background:SBcard,border:`1px solid ${GOLD}60`,borderRadius:9,padding:"12px 22px",fontSize:14,color:SBtext,display:"flex",alignItems:"center",gap:10,boxShadow:"0 8px 28px rgba(0,0,0,0.5)",animation:"slideD .3s ease",whiteSpace:"nowrap"}}>
@@ -5933,8 +6031,45 @@ export default function BAMFull(){
         </div>
       )}
 
+      {/* MOBILE SIDEBAR OVERLAY */}
+      {mobileMenuOpen&&<div onClick={()=>setMobileMenuOpen(false)} style={{position:"fixed",inset:0,zIndex:9990,background:"rgba(0,0,0,0.55)",display:"none"}} className="bam-sidebar-mobile"/>}
+      {mobileMenuOpen&&(
+        <div className="bam-sidebar-mobile" style={{position:"fixed",top:0,left:0,bottom:0,width:260,zIndex:9991,background:SBcard,display:"none",flexDirection:"column",animation:"bamSlideIn .2s ease",boxShadow:"4px 0 24px rgba(0,0,0,0.4)"}}>
+          <div style={{padding:"16px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`1px solid ${SBborder}`}}>
+            <div style={{fontSize:15,fontWeight:800,color:GOLD,letterSpacing:.5}}>BY ANY MEANS</div>
+            <span onClick={()=>setMobileMenuOpen(false)} style={{cursor:"pointer",color:SBdim,fontSize:22,lineHeight:1}}>×</span>
+          </div>
+          <div style={{flex:1,padding:"10px 0",overflowY:"auto"}}>
+            {NAV_SECTIONS.map((section,si)=>(
+              <div key={si} style={{marginBottom:2}}>
+                {section.label&&<div style={{fontSize:10,color:SBdim,letterSpacing:1.5,padding:"10px 18px 3px",fontWeight:700,textTransform:"uppercase"}}>{section.label}</div>}
+                {section.items.map(item=>{const active=nav===item.id;return(
+                  <div key={item.id} onClick={()=>go(item.id)} style={{padding:"9px 18px",fontSize:13,color:active?SBtext:SBmid,fontWeight:active?700:500,background:active?"rgba(226,221,159,0.1)":"transparent",borderLeft:active?`3px solid ${GOLD}`:"3px solid transparent",display:"flex",alignItems:"center",gap:11}}>
+                    <item.Icon size={16} color={active?GOLD:GOLD+"59"} strokeWidth={active?2.2:1.8}/>{item.label}
+                  </div>);})}
+                {section.subs&&section.subs.map(sub=>{const isOpen=!collapsed[sub.id];const subActive=sub.items.some(i=>i.id===nav);return(
+                  <div key={sub.id}>
+                    <div onClick={()=>toggleCollapse(sub.id)} style={{padding:"9px 18px",fontSize:12,color:subActive?GOLD:SBmid,fontWeight:subActive?700:600,display:"flex",alignItems:"center",gap:11,cursor:"pointer",borderLeft:subActive?`3px solid ${GOLD}44`:"3px solid transparent"}}>
+                      <sub.Icon size={15} color={subActive?GOLD:GOLD+"50"} strokeWidth={subActive?2.2:1.8}/>
+                      <span style={{flex:1,textTransform:"uppercase",letterSpacing:.8,fontSize:10,fontWeight:700}}>{sub.label}</span>
+                      <span style={{fontSize:10,color:SBdim,display:"inline-block",transform:isOpen?"rotate(90deg)":"rotate(0deg)",transition:"transform .2s"}}>›</span>
+                    </div>
+                    {isOpen&&sub.items.map(item=>{const active=nav===item.id;return(
+                      <div key={item.id} onClick={()=>go(item.id)} style={{padding:"7px 18px 7px 44px",fontSize:12.5,color:active?SBtext:SBmid,fontWeight:active?700:500,background:active?"rgba(226,221,159,0.08)":"transparent",borderLeft:active?`3px solid ${GOLD}`:"3px solid transparent",display:"flex",alignItems:"center",gap:10}}>
+                        <item.Icon size={14} color={active?GOLD:GOLD+"50"} strokeWidth={active?2.2:1.8}/>{item.label}
+                      </div>);})}
+                  </div>);})}
+                {section.standalone&&section.standalone.map(item=>{const active=nav===item.id;return(
+                  <div key={item.id} onClick={()=>go(item.id)} style={{padding:"9px 18px",fontSize:13,color:active?SBtext:SBmid,fontWeight:active?700:500,background:active?"rgba(226,221,159,0.1)":"transparent",borderLeft:active?`3px solid ${GOLD}`:"3px solid transparent",display:"flex",alignItems:"center",gap:11}}>
+                    <item.Icon size={16} color={active?GOLD:GOLD+"59"} strokeWidth={active?2.2:1.8}/>{item.label}
+                  </div>);})}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {/* SIDEBAR */}
-      <div style={{width:240,background:SBcard,borderRight:`1px solid ${SBborder}`,display:"flex",flexDirection:"column",flexShrink:0,position:"relative"}}>
+      <div className="bam-sidebar" style={{width:240,background:SBcard,borderRight:`1px solid ${SBborder}`,display:"flex",flexDirection:"column",flexShrink:0,position:"relative"}}>
         <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,${GOLD},${GOLD}44,transparent)`}}/>
         <div style={{padding:"22px 18px 16px",borderBottom:`1px solid ${SBborder}`,display:"flex",alignItems:"center",gap:12,position:"relative",overflow:"hidden"}}>
           <div style={{position:"absolute",top:-20,left:-8,width:120,height:80,background:GOLD,borderRadius:"50%",opacity:.06,filter:"blur(26px)",pointerEvents:"none"}}/>
@@ -6039,12 +6174,15 @@ export default function BAMFull(){
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
         {/* Topbar */}
         <div style={{height:58,background:C.bgCard,borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",padding:"0 26px",gap:14,flexShrink:0,boxShadow:dark?"none":`0 1px 8px ${C.shadow}`}}>
+          <div className="bam-hamburger" onClick={()=>setMobileMenuOpen(true)} style={{display:"none",alignItems:"center",justifyContent:"center",width:36,height:36,borderRadius:9,background:C.bg,border:`1px solid ${C.border}`,cursor:"pointer",flexShrink:0}}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.text} strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </div>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             {current&&<current.Icon size={16} color={GOLD} strokeWidth={2}/>}
             <div style={{fontSize:13,fontWeight:700,color:C.text}}>{current?.label}</div>
           </div>
           <div style={{flex:1}}/>
-          <SearchBar C={C}/>
+          <div className="bam-topbar-search"><SearchBar C={C}/></div>
           <div className="btn" onClick={()=>setNotifOn(n=>!n)} style={{width:36,height:36,borderRadius:9,background:notifOn?C.goldDim:C.bg,border:`1px solid ${notifOn?GOLD+"80":C.border}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
             <Ic.Bell c={notifOn?GOLD:C.textDim} dot={notifOn}/>
           </div>
@@ -6054,14 +6192,14 @@ export default function BAMFull(){
               <div className="tthm" style={{position:"absolute",top:4,left:4,width:15,height:15,borderRadius:"50%",background:dark?"#1A1A1A":"#fff",transform:dark?"translateX(20px)":"translateX(0)",boxShadow:"0 1px 5px rgba(0,0,0,.3)"}}/>
             </div>
           </div>
-          <div className="btn" onClick={()=>setNav("settings")} style={{width:36,height:36,borderRadius:9,background:nav==="settings"?C.goldDim:C.bg,border:`1px solid ${nav==="settings"?GOLD+"80":C.border}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+          <div className="btn" onClick={()=>go("settings")} style={{width:36,height:36,borderRadius:9,background:nav==="settings"?C.goldDim:C.bg,border:`1px solid ${nav==="settings"?GOLD+"80":C.border}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={nav==="settings"?GOLD:C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </div>
           <div style={{fontSize:11,color:dark?GOLD:"#111",background:dark?"rgba(226,221,159,0.12)":GOLD,border:`1px solid ${dark?GOLD+"45":"transparent"}`,borderRadius:6,padding:"5px 12px",fontWeight:800,letterSpacing:.8}}>MAX PLAN</div>
         </div>
 
         {/* Page */}
-        <div key={pageKey} className="pg" style={{flex:1,overflow:isContentPage?"hidden":"auto",display:"flex",flexDirection:"column"}}>
+        <BAMErrorBoundary key={pageKey}><div style={{flex:1,overflow:isContentPage?"hidden":"auto",display:"flex",flexDirection:"column",animation:"bamPageFade .15s ease both"}}>
 
           {/* Content pages */}
           {isContentPage&&<ContentPage sectionId={nav} C={C} dark={dark} favDrills={favDrills} toggleFav={toggleFav}/>}
@@ -6398,7 +6536,7 @@ export default function BAMFull(){
                       {items.map(item=>{
                         const tc=(SECTION_COLORS[item.sectionId]||SECTION_COLORS.pd)[item.id%8];
                         return (
-                          <div key={`${item.sectionId}-${item.id}`} onClick={()=>setNav(item.sectionId)}
+                          <div key={`${item.sectionId}-${item.id}`} onClick={()=>go(item.sectionId)}
                             style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden",cursor:"pointer",minHeight:44}}>
                             <div style={{height:70,background:tc,display:"flex",alignItems:"center",justifyContent:"center"}}>
                               <Play size={16} color="#fff" fill="#fff"/>
@@ -6431,7 +6569,7 @@ export default function BAMFull(){
                       {items.map(item=>{
                         const tc=(SECTION_COLORS[item.sectionId]||SECTION_COLORS.pd)[item.id%8];
                         return (
-                          <div key={`ntw-${item.sectionId}-${item.id}`} onClick={()=>setNav(item.sectionId)}
+                          <div key={`ntw-${item.sectionId}-${item.id}`} onClick={()=>go(item.sectionId)}
                             style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden",cursor:"pointer",minHeight:44}}>
                             <div style={{height:60,background:tc,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
                               <Play size={14} color="#fff" fill="#fff"/>
@@ -6594,19 +6732,19 @@ export default function BAMFull(){
               <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:72,color:GOLD,letterSpacing:4,lineHeight:1}}>404</div>
               <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:C.text,letterSpacing:3,marginTop:8}}>PAGE NOT FOUND</div>
               <div style={{fontSize:14,color:C.textDim,marginTop:12,maxWidth:340,lineHeight:1.6}}>Looks like this play didn't draw up right.</div>
-              <button onClick={()=>setNav("dashboard")}
+              <button onClick={()=>go("dashboard")}
                 style={{marginTop:24,padding:"10px 28px",borderRadius:8,fontSize:14,fontWeight:800,background:GOLD,color:"#111",border:"none",cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1}}>
                 Go Back
               </button>
             </div>
           )}
-        </div>
+        </div></BAMErrorBoundary>
       {profileName&&<ProfilePanel key={profileName} name={profileName} dark={dark} C={C} onClose={()=>setProfileName(null)}/>}
       {myProfileOpen&&<MyProfilePanel C={C} dark={dark} onClose={()=>setMyProfileOpen(false)}
         profile={appProfile} onProfileUpdate={setAppProfile} photo={appPhoto} onPhotoUpdate={setAppPhoto}
         dismissedBanners={dismissedBanners} dismissBanner={dismissBanner}/>}
       {mapOpen&&<MemberMapOverlay C={C} dark={dark} onClose={()=>setMapOpen(false)} onProfileClick={(name)=>{setProfileName(name);setMapOpen(false);}}/>}
-      {tourActive&&<TourOverlay onComplete={()=>setTourActive(false)} onNavigate={setNav}/>}
+      {tourActive&&<TourOverlay onComplete={()=>setTourActive(false)} onNavigate={go}/>}
       </div>
     </div>
   );
