@@ -2049,13 +2049,24 @@ COURT_BG_IMG.onload = () => { COURT_BG_LOADED = true; };
 COURT_BG_IMG.src = "/images/court-reference.png";
 
 function drawCourt(ctx, w, h, dark, igHandle, xHandle) {
-  // Fill background color (visible through transparent areas of court image)
-  ctx.fillStyle = dark ? "#2A2A2A" : "#E5CC8A";
+  // Fill court surface
+  ctx.fillStyle = dark ? "#2A2A2A" : "#F0EBE0";
   ctx.fillRect(0, 0, w, h);
 
-  // Draw court reference image on top
+  // Draw court lines from reference image, tinted for current theme
   if (COURT_BG_LOADED || COURT_BG_IMG.complete) {
-    ctx.drawImage(COURT_BG_IMG, 0, 0, w, h);
+    // Draw the PNG (assumed white/light lines on transparent) onto an offscreen canvas
+    // then tint it to the desired line color
+    const off = document.createElement("canvas");
+    off.width = w; off.height = h;
+    const ox = off.getContext("2d");
+    ox.drawImage(COURT_BG_IMG, 0, 0, w, h);
+    // Tint: fill with line color using source-in so only opaque pixels are colored
+    ox.globalCompositeOperation = "source-in";
+    ox.fillStyle = dark ? "#FFFFFF" : "#111111";
+    ox.fillRect(0, 0, w, h);
+    ox.globalCompositeOperation = "source-over";
+    ctx.drawImage(off, 0, 0);
   }
 
   // Social handles
@@ -2118,27 +2129,33 @@ function drawBall(ctx, x, y, selected) {
   ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fill();
   // Selection glow
   if (selected) { ctx.shadowColor="#E8762A"; ctx.shadowBlur=14; }
-  // Main orange fill
+  // Solid orange fill with subtle shading
   ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2);
-  const ballGrad = ctx.createRadialGradient(x-3, y-3, 1, x, y, r);
-  ballGrad.addColorStop(0, "#F5983A");
-  ballGrad.addColorStop(0.6, "#E8762A");
-  ballGrad.addColorStop(1, "#C45A18");
-  ctx.fillStyle = ballGrad; ctx.fill();
-  ctx.strokeStyle="#8B3A00"; ctx.lineWidth=1.2; ctx.stroke();
-  // Seam lines
+  const bg = ctx.createRadialGradient(x-2, y-2, 1, x, y, r);
+  bg.addColorStop(0, "#F09030");
+  bg.addColorStop(0.7, "#E8762A");
+  bg.addColorStop(1, "#C45A18");
+  ctx.fillStyle = bg; ctx.fill();
+  ctx.strokeStyle="#8B3A00"; ctx.lineWidth=1; ctx.stroke();
   ctx.shadowColor="transparent"; ctx.shadowBlur=0;
-  ctx.strokeStyle="rgba(30,10,0,0.5)"; ctx.lineWidth=1;
-  // Vertical seam
+  // Clip seams to ball circle
+  ctx.beginPath(); ctx.arc(x, y, r-0.5, 0, Math.PI*2); ctx.clip();
+  ctx.strokeStyle="rgba(20,5,0,0.55)"; ctx.lineWidth=0.9;
+  // Vertical center seam
   ctx.beginPath(); ctx.moveTo(x, y-r); ctx.lineTo(x, y+r); ctx.stroke();
-  // Horizontal seam (full)
-  ctx.beginPath(); ctx.moveTo(x-r, y); ctx.lineTo(x+r, y); ctx.stroke();
-  // Curved seams (left and right arcs)
-  ctx.beginPath(); ctx.arc(x, y, r*0.65, -Math.PI*0.42, Math.PI*0.42); ctx.stroke();
-  ctx.beginPath(); ctx.arc(x, y, r*0.65, Math.PI-Math.PI*0.42, Math.PI+Math.PI*0.42); ctx.stroke();
-  // Highlight
-  ctx.beginPath(); ctx.arc(x-3, y-3, r*0.45, 0, Math.PI*2);
-  ctx.fillStyle="rgba(255,255,255,0.22)"; ctx.fill();
+  // Top curved seam (arc bowing upward)
+  ctx.beginPath();
+  ctx.moveTo(x-r, y);
+  ctx.bezierCurveTo(x-r*0.5, y-r*0.75, x+r*0.5, y-r*0.75, x+r, y);
+  ctx.stroke();
+  // Bottom curved seam (arc bowing downward)
+  ctx.beginPath();
+  ctx.moveTo(x-r, y);
+  ctx.bezierCurveTo(x-r*0.5, y+r*0.75, x+r*0.5, y+r*0.75, x+r, y);
+  ctx.stroke();
+  // Shine highlight dot
+  ctx.beginPath(); ctx.arc(x-r*0.35, y-r*0.35, r*0.22, 0, Math.PI*2);
+  ctx.fillStyle="rgba(255,255,255,0.45)"; ctx.fill();
   ctx.restore();
 }
 
@@ -2188,7 +2205,7 @@ function drawScreen(ctx, x, y, col, rot, selected) {
 }
 
 // ── PlayCanvas ─────────────────────────────────────────────────────────────
-function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress, prevStageObjs, igHandle, xHandle }) {
+function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress, prevStageObjs, igHandle, xHandle, onNextStage }) {
   const courtRef  = useRef(null);
   const overlayRef = useRef(null);
   const [tool, setTool]     = useState("select");
@@ -2454,6 +2471,47 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
 
   const selectedIsScreen = drawings.find(d=>d.id===selected&&d.type==="screen");
 
+  const addOffensivePlayer = useCallback(() => {
+    if (readOnly) return;
+    const n=players.length;
+    const oLabels=["1","2","3","4","5"];
+    const cx_=COURT_W/2, cy_=COURT_H/2;
+    const oCount=players.filter(p=>!p.label.startsWith("X")).length;
+    const positions={};
+    const stageCount=play?.stages?.length||1;
+    const offset=(oCount%5)*25-50;
+    for(let i=0;i<stageCount;i++) positions[i]={x:cx_+offset,y:cy_};
+    const id=nextId.current++;
+    pushHist({...play,players:[...players,{id,label:oLabels[oCount%5],color:DRAW_COLORS[0],positions}]});
+  },[readOnly,players,play,pushHist]);
+
+  const addDefensivePlayer = useCallback(() => {
+    if (readOnly) return;
+    const cx_=COURT_W/2, cy_=COURT_H/2;
+    const dCount=players.filter(p=>p.label.startsWith("X")).length;
+    const positions={};
+    const stageCount=play?.stages?.length||1;
+    const offset=(dCount%5)*25-50;
+    for(let i=0;i<stageCount;i++) positions[i]={x:cx_+offset,y:cy_+30};
+    const id=nextId.current++;
+    pushHist({...play,players:[...players,{id,label:"X"+(dCount+1),color:"#E06060",positions}]});
+  },[readOnly,players,play,pushHist]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    if (readOnly) return;
+    const handler = (e) => {
+      // Ignore if user is typing in an input/textarea
+      if (e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA"||e.target.tagName==="SELECT") return;
+      if (e.key==="n"||e.key==="N") { e.preventDefault(); addOffensivePlayer(); }
+      else if (e.key==="d"||e.key==="D") { e.preventDefault(); addDefensivePlayer(); }
+      else if (e.key==="Enter") { e.preventDefault(); onNextStage && onNextStage(); }
+      else if ((e.metaKey||e.ctrlKey)&&e.key==="z") { e.preventDefault(); undo(); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  },[readOnly,addOffensivePlayer,addDefensivePlayer,onNextStage,undo]);
+
   return (
     <div style={{display:"flex",flexDirection:"column",gap:8}}>
       {!readOnly && (
@@ -2549,6 +2607,13 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
           onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
           onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp}/>
       </div>
+      {!readOnly && (
+        <div style={{display:"flex",gap:12,flexWrap:"wrap",opacity:0.5,fontSize:10,color:C.textDim,marginTop:2}}>
+          {[["N","Add offense"],["D","Add defense"],["Enter","Next stage"],["\u2318Z","Undo"]].map(([k,v])=>(
+            <span key={k}><kbd style={{background:dark?"#222":"#e0e0e0",padding:"1px 4px",borderRadius:3,fontFamily:"monospace",fontSize:10,border:`1px solid ${dark?"#333":"#ccc"}`}}>{k}</kbd> {v}</span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -3068,6 +3133,11 @@ function PlaybookBuilder({ C, dark }) {
                   animProgress={animProgress}
                   prevStageObjs={prevStageObjs}
                   igHandle={igHandle} xHandle={xHandle}
+                  onNextStage={()=>{
+                    const total=currentPlay?.stages?.length||1;
+                    if(stageIdx<total-1) setStageIdx(stageIdx+1);
+                    else addStage();
+                  }}
                 />
 
                 <div style={{marginTop:9,display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
