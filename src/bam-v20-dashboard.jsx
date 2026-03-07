@@ -300,6 +300,7 @@ const css = `
   .bam-dash-bottom{grid-template-columns:1fr!important;}
   .bam-dash-bottom>div:last-child{order:-1;}
   .bam-dash-grid{grid-template-columns:1fr!important;}
+  .bam-settings-row{min-height:44px!important;}
 }
 @media(max-width:480px){
   .bam-dash-cards{grid-template-columns:1fr!important;}
@@ -4782,7 +4783,7 @@ function DashIntro({dark}){
 }
 
 // ── MY PROFILE PANEL ───────────────────────────────────────────────────────
-function MyProfilePanel({C, dark, onClose, profile, onProfileUpdate, photo, onPhotoUpdate}){
+function MyProfilePanel({C, dark, onClose, profile, onProfileUpdate, photo, onPhotoUpdate, dismissedBanners, dismissBanner}){
   const [editing, setEditing] = useState(false);
   const [photoHover, setPhotoHover] = useState(false);
   const [draft, setDraft] = useState({...profile});
@@ -5088,6 +5089,22 @@ function MyProfilePanel({C, dark, onClose, profile, onProfileUpdate, photo, onPh
             </div>
           </div>
 
+          {/* Prompt 7: Profile cert banner */}
+          {dismissBanner&&!(dismissedBanners||[]).includes("profile-cert")&&(
+            <div style={{background:dark?"rgba(226,221,159,0.06)":"rgba(226,221,159,0.12)",border:`1px solid ${GOLD}44`,
+              borderRadius:10,padding:"14px 16px",marginTop:18,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",position:"relative"}}>
+              <div className="btn" onClick={()=>dismissBanner("profile-cert")} style={{position:"absolute",top:6,right:10,fontSize:12,color:C.textDim,cursor:"pointer"}}>×</div>
+              <div style={{flex:1,minWidth:160}}>
+                <div style={{fontSize:13,color:C.text,fontWeight:600}}>Take your coaching further</div>
+                <div style={{fontSize:11,color:C.textDim,marginTop:2}}>Get BAM Certified</div>
+              </div>
+              <a href="https://byanymeanscoaches.com/certification" target="_blank" rel="noopener noreferrer"
+                style={{padding:"7px 16px",borderRadius:7,background:GOLD,color:"#111",fontSize:11,fontWeight:800,textDecoration:"none",flexShrink:0}}>
+                Get Certified
+              </a>
+            </div>
+          )}
+
           <div style={{height:1,background:dark?"#2E2E2E":C.border,margin:"18px 0"}}/>
 
           {/* Prompt 4 & 5: Account section */}
@@ -5205,7 +5222,7 @@ const MOCK_BOOKS = [
   { id:3, title:"Bounce: Mozart, Federer, Picasso, Beckham, and the Science of Success", author:"Matthew Syed", url:"https://www.amazon.com/Bounce-Mozart-Federer-Picasso-Beckham/dp/0061723762", desc:"A former Olympic athlete examines the role of practice, mindset, and opportunity in achieving greatness." },
 ];
 
-function ResourcesPage({C, dark}){
+function ResourcesPage({C, dark, dismissedBanners, dismissBanner}){
   const [expanded, setExpanded] = useState(null);
   const [collapsingId, setCollapsingId] = useState(null);
   const [summaries, setSummaries] = useState(()=>{
@@ -5355,6 +5372,20 @@ function ResourcesPage({C, dark}){
             </div>
           </div>
         </div>
+
+        {/* Prompt 7: Resources cert banner */}
+        {dismissBanner&&!(dismissedBanners||[]).includes("resources-cert")&&(
+          <div style={{background:`linear-gradient(135deg,${dark?"#2A2410":"#FFF8E0"},${dark?"#1E1E1E":"#FFFDF5"})`,
+            border:`1px solid ${GOLD}55`,borderRadius:13,padding:"28px 24px",marginBottom:28,textAlign:"center",position:"relative"}}>
+            <div className="btn" onClick={()=>dismissBanner("resources-cert")} style={{position:"absolute",top:10,right:14,fontSize:14,color:dark?GOLD+"77":"#999",cursor:"pointer"}}>×</div>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:GOLD,letterSpacing:2,marginBottom:10}}>JOIN THE BAM COACHES CERTIFICATION PROGRAM</div>
+            <div style={{fontSize:13,color:C.textMid,marginBottom:16,lineHeight:1.5,maxWidth:480,margin:"0 auto 16px"}}>Take your coaching to the next level with structured learning, mentorship, and official certification.</div>
+            <a href="https://byanymeanscoaches.com/certification" target="_blank" rel="noopener noreferrer"
+              style={{display:"inline-block",padding:"10px 28px",borderRadius:8,background:GOLD,color:"#111",fontSize:14,fontWeight:800,textDecoration:"none",letterSpacing:.5}}>
+              Get Certified
+            </a>
+          </div>
+        )}
 
         {/* Research Papers */}
         {sectionTitle("RESEARCH PAPERS")}
@@ -5511,11 +5542,170 @@ function ResourcesPage({C, dark}){
   );
 }
 
+// ── IANA TIMEZONE LIST (common) ──────────────────────────────────────────
+const IANA_TIMEZONES=["Africa/Cairo","Africa/Johannesburg","Africa/Lagos","Africa/Nairobi","America/Anchorage","America/Argentina/Buenos_Aires","America/Bogota","America/Chicago","America/Denver","America/Halifax","America/Los_Angeles","America/Mexico_City","America/New_York","America/Phoenix","America/Santiago","America/Sao_Paulo","America/St_Johns","America/Toronto","America/Vancouver","Asia/Bangkok","Asia/Colombo","Asia/Dubai","Asia/Hong_Kong","Asia/Istanbul","Asia/Jakarta","Asia/Karachi","Asia/Kolkata","Asia/Manila","Asia/Seoul","Asia/Shanghai","Asia/Singapore","Asia/Taipei","Asia/Tehran","Asia/Tokyo","Atlantic/Reykjavik","Australia/Adelaide","Australia/Brisbane","Australia/Melbourne","Australia/Perth","Australia/Sydney","Europe/Amsterdam","Europe/Athens","Europe/Berlin","Europe/Brussels","Europe/Dublin","Europe/Helsinki","Europe/Lisbon","Europe/London","Europe/Madrid","Europe/Moscow","Europe/Oslo","Europe/Paris","Europe/Prague","Europe/Rome","Europe/Stockholm","Europe/Vienna","Europe/Warsaw","Europe/Zurich","Pacific/Auckland","Pacific/Fiji","Pacific/Guam","Pacific/Honolulu"];
+
+function getTzAbbr(tz){try{return new Intl.DateTimeFormat("en-US",{timeZone:tz,timeZoneName:"short"}).formatToParts(new Date()).find(p=>p.type==="timeZoneName")?.value||"";}catch{return "";}}
+
+function fmtTimeInTz(date,tz){
+  try{
+    const d=new Date(typeof date==="number"?date:date);
+    const parts=new Intl.DateTimeFormat("en-US",{timeZone:tz,hour:"numeric",minute:"2-digit",hour12:true,timeZoneName:"short"}).formatToParts(d);
+    return parts.map(p=>p.value).join("");
+  }catch{return "";}
+}
+
+// ── SETTINGS PAGE ──────────────────────────────────────────────────────────
+function SettingsPage({C,dark,toggleDark,notifs,updateNotif,tz,updateTz,mapVisible,toggleMapVisible,dismissBanner,dismissedBanners}){
+  const [tzSearch, setTzSearch] = useState("");
+  const [tzOpen, setTzOpen] = useState(false);
+  const [savedKey, setSavedKey] = useState(null);
+  const showSaved=(key)=>{setSavedKey(key);setTimeout(()=>setSavedKey(null),1500);};
+
+  const filteredTz=tzSearch?IANA_TIMEZONES.filter(t=>t.toLowerCase().includes(tzSearch.toLowerCase())):IANA_TIMEZONES;
+
+  const Toggle=({checked,onChange,label,sKey,badge})=>(
+    <div className="bam-settings-row" style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 0",minHeight:44,borderBottom:`1px solid ${C.border}`}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,flex:1,minWidth:0}}>
+        <span style={{fontSize:14,color:C.text,fontWeight:500}}>{label}</span>
+        {badge&&<span style={{fontSize:9,fontWeight:700,color:GOLD,background:dark?"rgba(226,221,159,0.12)":"rgba(226,221,159,0.3)",padding:"2px 8px",borderRadius:10,letterSpacing:.5}}>{badge}</span>}
+        {savedKey===sKey&&<span style={{fontSize:11,color:GOLD,fontWeight:600,animation:"bamFadeOut 1.5s forwards"}}>Saved</span>}
+      </div>
+      <div className="ttgl" onClick={()=>{onChange(!checked);showSaved(sKey);}}
+        style={{width:44,height:24,borderRadius:12,background:checked?GOLD:dark?"#444":C.border,position:"relative",flexShrink:0,cursor:"pointer"}}>
+        <div className="tthm" style={{position:"absolute",top:4,left:4,width:15,height:15,borderRadius:"50%",background:checked?(dark?"#1A1A1A":"#fff"):(dark?"#666":"#fff"),transform:checked?"translateX(20px)":"translateX(0)",boxShadow:"0 1px 5px rgba(0,0,0,.3)"}}/>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{flex:1,overflow:"auto",overflowX:"hidden",padding:"28px 28px 40px"}}>
+      <div style={{maxWidth:600}}>
+        <div style={{fontSize:22,fontWeight:900,color:C.text,letterSpacing:-.3,marginBottom:4}}>Settings</div>
+        <div style={{fontSize:13,color:C.textDim,marginBottom:28}}>Manage your preferences</div>
+
+        {/* Prompt 6: Upgrade banner */}
+        {!dismissedBanners.includes("settings-cert")&&(
+          <div style={{background:`linear-gradient(135deg,${dark?"#2A2410":"#FFF8E0"},${dark?"#1E1E1E":"#FFFDF5"})`,border:`1px solid ${GOLD}55`,borderRadius:13,padding:"20px 22px",marginBottom:28,position:"relative"}}>
+            <div className="btn" onClick={()=>dismissBanner("settings-cert")} style={{position:"absolute",top:10,right:12,fontSize:14,color:C.textDim,cursor:"pointer"}}>×</div>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:18,color:GOLD,letterSpacing:1.5,marginBottom:6}}>ELEVATE YOUR COACHING</div>
+            <div style={{fontSize:13,color:C.textMid,marginBottom:14,lineHeight:1.5}}>Get certified with the BAM Coaches Certification Program</div>
+            <a href="https://byanymeanscoaches.com/certification" target="_blank" rel="noopener noreferrer"
+              style={{display:"inline-block",padding:"9px 22px",borderRadius:8,background:GOLD,color:"#111",fontSize:13,fontWeight:800,textDecoration:"none",letterSpacing:.3}}>
+              Get Certified
+            </a>
+          </div>
+        )}
+
+        {/* Appearance */}
+        <div style={{marginBottom:28}}>
+          <div style={{fontSize:12,fontWeight:800,color:C.textDim,letterSpacing:1,textTransform:"uppercase",marginBottom:12}}>Appearance</div>
+          <div style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:13,padding:"4px 18px",boxShadow:dark?"none":`0 2px 14px ${C.shadow}`}}>
+            <div className="bam-settings-row" style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 0",minHeight:44}}>
+              <span style={{fontSize:14,color:C.text,fontWeight:500}}>Dark Mode</span>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                {savedKey==="dark"&&<span style={{fontSize:11,color:GOLD,fontWeight:600,animation:"bamFadeOut 1.5s forwards"}}>Saved</span>}
+                <div className="ttgl" onClick={()=>{toggleDark();showSaved("dark");}}
+                  style={{width:44,height:24,borderRadius:12,background:dark?GOLD:C.border,position:"relative",cursor:"pointer"}}>
+                  <div className="tthm" style={{position:"absolute",top:4,left:4,width:15,height:15,borderRadius:"50%",background:dark?"#1A1A1A":"#fff",transform:dark?"translateX(20px)":"translateX(0)",boxShadow:"0 1px 5px rgba(0,0,0,.3)"}}/>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Notifications */}
+        <div style={{marginBottom:28}}>
+          <div style={{fontSize:12,fontWeight:800,color:C.textDim,letterSpacing:1,textTransform:"uppercase",marginBottom:12}}>Notifications</div>
+          <div style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:13,padding:"4px 18px",boxShadow:dark?"none":`0 2px 14px ${C.shadow}`}}>
+            <Toggle checked={notifs.inApp} onChange={v=>updateNotif("inApp",v)} label="In-app notifications" sKey="inApp"/>
+            <Toggle checked={notifs.callReminder} onChange={v=>updateNotif("callReminder",v)} label="Call reminders (24h & 1h before)" sKey="callReminder"/>
+            <Toggle checked={false} onChange={()=>{}} label="Email notifications" sKey="email" badge="Coming soon"/>
+          </div>
+        </div>
+
+        {/* Timezone */}
+        <div style={{marginBottom:28}}>
+          <div style={{fontSize:12,fontWeight:800,color:C.textDim,letterSpacing:1,textTransform:"uppercase",marginBottom:12}}>Timezone</div>
+          <div style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 18px",boxShadow:dark?"none":`0 2px 14px ${C.shadow}`,position:"relative"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:tzOpen?10:0}}>
+              <div onClick={()=>setTzOpen(o=>!o)}
+                style={{flex:1,display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",minHeight:32}}>
+                <div>
+                  <span style={{fontSize:14,color:C.text,fontWeight:500}}>{tz}</span>
+                  <span style={{fontSize:12,color:GOLD,fontWeight:600,marginLeft:8}}>{getTzAbbr(tz)}</span>
+                </div>
+                <ChevronDown size={14} color={C.textDim} style={{transition:"transform .2s",transform:tzOpen?"rotate(180deg)":"rotate(0)"}}/>
+              </div>
+              {savedKey==="tz"&&<span style={{fontSize:11,color:GOLD,fontWeight:600,animation:"bamFadeOut 1.5s forwards",flexShrink:0}}>Saved</span>}
+            </div>
+            {tzOpen&&(
+              <div>
+                <input value={tzSearch} onChange={e=>setTzSearch(e.target.value)} placeholder="Search timezones..."
+                  style={{width:"100%",padding:"8px 12px",borderRadius:8,border:`1px solid ${C.border}`,
+                    background:dark?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.04)",color:C.text,fontSize:13,outline:"none",marginBottom:8,boxSizing:"border-box"}}/>
+                <div style={{maxHeight:200,overflowY:"auto",borderRadius:8,border:`1px solid ${C.border}`}}>
+                  {filteredTz.map(t=>(
+                    <div key={t} onClick={()=>{updateTz(t);setTzOpen(false);setTzSearch("");showSaved("tz");}}
+                      style={{padding:"10px 14px",fontSize:13,color:t===tz?GOLD:C.text,fontWeight:t===tz?700:400,
+                        background:t===tz?(dark?"rgba(226,221,159,0.08)":"rgba(226,221,159,0.15)"):"transparent",
+                        cursor:"pointer",borderBottom:`1px solid ${C.border}`,minHeight:44,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                      <span>{t}</span>
+                      <span style={{fontSize:11,color:C.textDim}}>{getTzAbbr(t)}</span>
+                    </div>
+                  ))}
+                  {filteredTz.length===0&&<div style={{padding:"14px",fontSize:13,color:C.textDim,textAlign:"center"}}>No matching timezone</div>}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Privacy */}
+        <div style={{marginBottom:28}}>
+          <div style={{fontSize:12,fontWeight:800,color:C.textDim,letterSpacing:1,textTransform:"uppercase",marginBottom:12}}>Privacy</div>
+          <div style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:13,padding:"4px 18px",boxShadow:dark?"none":`0 2px 14px ${C.shadow}`}}>
+            <Toggle checked={mapVisible} onChange={v=>toggleMapVisible(v)} label="Show me on the community map" sKey="map"/>
+          </div>
+        </div>
+
+        {/* Billing */}
+        <div style={{marginBottom:28}}>
+          <div style={{fontSize:12,fontWeight:800,color:C.textDim,letterSpacing:1,textTransform:"uppercase",marginBottom:12}}>Billing</div>
+          <div style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:13,padding:"18px",boxShadow:dark?"none":`0 2px 14px ${C.shadow}`}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+              <div>
+                <div style={{fontSize:14,fontWeight:700,color:C.text}}>BAM Coaches Member</div>
+                <div style={{fontSize:12,color:C.textDim,marginTop:2}}>Max Plan · Active</div>
+              </div>
+              <div style={{position:"relative"}}>
+                <button disabled title="Billing portal coming soon"
+                  style={{padding:"8px 18px",borderRadius:8,border:`1px solid ${C.border}`,background:"transparent",
+                    color:C.textDim,fontSize:13,fontWeight:600,cursor:"not-allowed",opacity:0.5}}>
+                  Manage Billing
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function BAMFull(){
   const [onboarded,setOnboarded]=useState(()=>{
     try{ return localStorage.getItem("onboardingComplete")==="true"; }catch(e){ return false; }
   });
-  const [dark,setDark]=useState(true);
+  // Prompt 2: dark mode with localStorage persistence + OS default
+  const [dark,setDark]=useState(()=>{
+    try{
+      const saved=localStorage.getItem("bam_dark_mode");
+      if(saved!==null) return saved==="true";
+    }catch{}
+    if(typeof window!=="undefined"&&window.matchMedia) return window.matchMedia("(prefers-color-scheme:dark)").matches;
+    return true;
+  });
   const [tourActive,setTourActive]=useState(false);
   const [loading,setLoading]=useState(true);
   useEffect(()=>{ const t=setTimeout(()=>setLoading(false),1800); return ()=>clearTimeout(t); },[]);
@@ -5569,6 +5759,30 @@ export default function BAMFull(){
   const ptsRef=useRef(null);
   const scrollRef=useRef(null);
   const [scrollY,setScrollY]=useState(0);
+  const toggleDark=()=>setDark(d=>{const n=!d;try{localStorage.setItem("bam_dark_mode",String(n));}catch{}return n;});
+
+  // Settings state
+  const [settingsNotifs, setSettingsNotifs] = useState(()=>{
+    try{return JSON.parse(localStorage.getItem("bam_settings_notifs")||'{"inApp":true,"email":false,"callReminder":true}');}catch{return{inApp:true,email:false,callReminder:true};}
+  });
+  const updateNotifSetting=(key,val)=>{
+    setSettingsNotifs(prev=>{const n={...prev,[key]:val};try{localStorage.setItem("bam_settings_notifs",JSON.stringify(n));}catch{}return n;});
+  };
+  const [settingsTz, setSettingsTz] = useState(()=>{
+    try{return localStorage.getItem("bam_settings_tz")||Intl.DateTimeFormat().resolvedOptions().timeZone;}catch{return "America/New_York";}
+  });
+  const updateTz=(tz)=>{setSettingsTz(tz);try{localStorage.setItem("bam_settings_tz",tz);}catch{}};
+  const [mapVisible, setMapVisible] = useState(()=>{
+    try{const v=localStorage.getItem("bam_map_visible");return v===null?true:v==="true";}catch{return true;}
+  });
+  const toggleMapVisible=(v)=>{setMapVisible(v);try{localStorage.setItem("bam_map_visible",String(v));}catch{}};
+
+  // Prompt 7: upgrade banner dismissals
+  const [dismissedBanners, setDismissedBanners] = useState(()=>{
+    try{return JSON.parse(localStorage.getItem("bam_dismissed_banners")||"[]");}catch{return[];}
+  });
+  const dismissBanner=(id)=>{setDismissedBanners(prev=>{const n=[...prev,id];try{localStorage.setItem("bam_dismissed_banners",JSON.stringify(n));}catch{}return n;});};
+
   // Prompt 2: Lifted profile state for app-wide propagation
   const [appProfile, setAppProfile] = useState({
     name:"Coleman Ayers", handle:"@colemanayers", role:"Head Coach / Trainer",
@@ -5629,10 +5843,10 @@ export default function BAMFull(){
   const C=dark?DARK:LIGHT;
 
   useEffect(()=>{
-    if(!notifOn) return;
+    if(!notifOn||!settingsNotifs.inApp) return;
     const t=setTimeout(()=>{ setNotif("New drill drop: 1v1 Live Finishing"); setTimeout(()=>setNotif(null),4000); },3000);
     return ()=>clearTimeout(t);
-  },[nav,notifOn]);
+  },[nav,notifOn,settingsNotifs.inApp]);
 
   useEffect(()=>{
     const ob=new IntersectionObserver(([e])=>{ if(e.isIntersecting) setPtsVis(true); },{threshold:.3});
@@ -5703,7 +5917,7 @@ export default function BAMFull(){
       )}
 
       {/* Call notification banner */}
-      {callBanner&&callBanner.diff<=86400000&&(
+      {callBanner&&callBanner.diff<=86400000&&settingsNotifs.callReminder&&(
         <div style={{position:"fixed",top:notif&&notifOn?52:14,left:"50%",transform:"translateX(-50%)",zIndex:9998,background:"linear-gradient(135deg,#242424,#1A1A1A)",border:`1px solid ${GOLD}80`,borderRadius:10,padding:"10px 20px",fontSize:13,color:SBtext,display:"flex",alignItems:"center",gap:12,boxShadow:`0 8px 28px rgba(0,0,0,0.5),0 0 0 1px ${GOLD}20`,animation:"slideD .3s ease",whiteSpace:"nowrap"}}>
           <Video size={15} color={GOLD}/>
           <span style={{fontWeight:700,color:GOLD}}>{callBanner.title}</span>
@@ -5836,9 +6050,12 @@ export default function BAMFull(){
           </div>
           <div style={{display:"flex",alignItems:"center",gap:9}}>
             <span style={{fontSize:12,color:C.textDim,fontWeight:500}}>{dark?"Dark":"Light"}</span>
-            <div className="ttgl" onClick={()=>setDark(d=>!d)} style={{width:44,height:24,borderRadius:12,background:dark?GOLD:C.border,position:"relative"}}>
+            <div className="ttgl" onClick={toggleDark} style={{width:44,height:24,borderRadius:12,background:dark?GOLD:C.border,position:"relative"}}>
               <div className="tthm" style={{position:"absolute",top:4,left:4,width:15,height:15,borderRadius:"50%",background:dark?"#1A1A1A":"#fff",transform:dark?"translateX(20px)":"translateX(0)",boxShadow:"0 1px 5px rgba(0,0,0,.3)"}}/>
             </div>
+          </div>
+          <div className="btn" onClick={()=>setNav("settings")} style={{width:36,height:36,borderRadius:9,background:nav==="settings"?C.goldDim:C.bg,border:`1px solid ${nav==="settings"?GOLD+"80":C.border}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={nav==="settings"?GOLD:C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </div>
           <div style={{fontSize:11,color:dark?GOLD:"#111",background:dark?"rgba(226,221,159,0.12)":GOLD,border:`1px solid ${dark?GOLD+"45":"transparent"}`,borderRadius:6,padding:"5px 12px",fontWeight:800,letterSpacing:.8}}>MAX PLAN</div>
         </div>
@@ -5982,7 +6199,7 @@ export default function BAMFull(){
                       {/* Collapsed row */}
                       <div onClick={()=>setCallsOpen(o=>!o)} style={{background:C.bgCard,border:`1px solid ${callsOpen?GOLD+"50":C.border}`,borderRadius:10,padding:"10px 16px",display:"flex",alignItems:"center",gap:10,cursor:"pointer",transition:"border-color .2s"}}>
                         <CalendarDays size={14} color={GOLD}/>
-                        <span style={{fontSize:13,fontWeight:600,color:C.text,flex:1}}>Next Call: Monday 7PM EST</span>
+                        <span style={{fontSize:13,fontWeight:600,color:C.text,flex:1}}>Next Call: Monday {fmtTimeInTz(next.dateTime,settingsTz)}</span>
                         {diff>0
                           ?<span style={{fontSize:12,color:GOLD,fontWeight:700}}>{fmtCountdown(diff)}</span>
                           :<span style={{fontSize:11,fontWeight:800,color:"#fff",background:"#E06060",padding:"3px 10px",borderRadius:20,display:"inline-flex",alignItems:"center",gap:5,animation:"livePulse 1.5s ease-in-out infinite"}}>
@@ -6075,6 +6292,23 @@ export default function BAMFull(){
                   <div style={{fontSize:16,fontWeight:600,color:C.textMid,letterSpacing:.2}}>{getGreeting()}, {userName}.</div>
                 )}
               </div>
+
+              {/* Prompt 7: Upgrade banner on dashboard */}
+              {!dismissedBanners.includes("dash-cert")&&(
+                <div className={dashIntro?"dash-intro-item":""} style={{marginBottom:16,animationDelay:"0.48s",
+                  background:`linear-gradient(135deg,${dark?"#2A2410":"#FFF8E0"},${dark?"#1E1E1E":"#FFFDF5"})`,
+                  border:`1px solid ${GOLD}55`,borderRadius:13,padding:"14px 20px",display:"flex",alignItems:"center",gap:14,flexWrap:"wrap",position:"relative"}}>
+                  <div style={{flex:1,minWidth:200}}>
+                    <span style={{fontSize:14,fontWeight:700,color:C.text}}>Ready to level up? </span>
+                    <span style={{fontSize:14,color:C.textMid}}>Get BAM Certified.</span>
+                  </div>
+                  <a href="https://byanymeanscoaches.com/certification" target="_blank" rel="noopener noreferrer"
+                    style={{padding:"8px 18px",borderRadius:8,background:GOLD,color:"#111",fontSize:12,fontWeight:800,textDecoration:"none",flexShrink:0}}>
+                    Learn More
+                  </a>
+                  <div className="btn" onClick={()=>dismissBanner("dash-cert")} style={{position:"absolute",top:8,right:12,fontSize:14,color:C.textDim,cursor:"pointer"}}>×</div>
+                </div>
+              )}
 
               {/* HOW DO YOU WANT TO GET BETTER TODAY */}
               <div className={dashIntro?"dash-intro-item":""} style={{marginBottom:32,animationDelay:"0.55s"}}>
@@ -6336,7 +6570,7 @@ export default function BAMFull(){
 
           {/* Resources */}
           {nav==="resources"&&(
-            <ResourcesPage C={C} dark={dark}/>
+            <ResourcesPage C={C} dark={dark} dismissedBanners={dismissedBanners} dismissBanner={dismissBanner}/>
           )}
 
           {/* Playbook Builder */}
@@ -6344,8 +6578,17 @@ export default function BAMFull(){
             <PlaybookBuilder C={C} dark={dark}/>
           )}
 
+          {/* Settings */}
+          {nav==="settings"&&(
+            <SettingsPage C={C} dark={dark} toggleDark={toggleDark}
+              notifs={settingsNotifs} updateNotif={updateNotifSetting}
+              tz={settingsTz} updateTz={updateTz}
+              mapVisible={mapVisible} toggleMapVisible={toggleMapVisible}
+              dismissBanner={dismissBanner} dismissedBanners={dismissedBanners}/>
+          )}
+
           {/* 404 fallback for unmatched nav */}
-          {!isContentPage&&nav!=="dashboard"&&nav!=="community"&&nav!=="resources"&&nav!=="playbook"&&(
+          {!isContentPage&&nav!=="dashboard"&&nav!=="community"&&nav!=="resources"&&nav!=="playbook"&&nav!=="settings"&&(
             <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",padding:40,textAlign:"center"}}>
               <img src={BAM_LOGO_PNG} alt="BAM" style={{width:56,height:56,objectFit:"contain",marginBottom:24,opacity:.6}} />
               <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:72,color:GOLD,letterSpacing:4,lineHeight:1}}>404</div>
@@ -6360,7 +6603,8 @@ export default function BAMFull(){
         </div>
       {profileName&&<ProfilePanel key={profileName} name={profileName} dark={dark} C={C} onClose={()=>setProfileName(null)}/>}
       {myProfileOpen&&<MyProfilePanel C={C} dark={dark} onClose={()=>setMyProfileOpen(false)}
-        profile={appProfile} onProfileUpdate={setAppProfile} photo={appPhoto} onPhotoUpdate={setAppPhoto}/>}
+        profile={appProfile} onProfileUpdate={setAppProfile} photo={appPhoto} onPhotoUpdate={setAppPhoto}
+        dismissedBanners={dismissedBanners} dismissBanner={dismissBanner}/>}
       {mapOpen&&<MemberMapOverlay C={C} dark={dark} onClose={()=>setMapOpen(false)} onProfileClick={(name)=>{setProfileName(name);setMapOpen(false);}}/>}
       {tourActive&&<TourOverlay onComplete={()=>setTourActive(false)} onNavigate={setNav}/>}
       </div>
