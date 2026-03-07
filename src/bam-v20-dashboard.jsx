@@ -2538,8 +2538,32 @@ const PUBLIC_PLAYBOOKS = [
 // Pre-load court background image
 let COURT_BG_LOADED = false;
 const COURT_BG_IMG = new Image();
+let COURT_BG_FAILED = false;
 COURT_BG_IMG.onload = () => { COURT_BG_LOADED = true; };
+COURT_BG_IMG.onerror = () => { COURT_BG_FAILED = true; };
 COURT_BG_IMG.src = "/images/court-reference.png";
+
+function drawCourtFallbackLines(ctx, w, h, lineColor) {
+  ctx.strokeStyle = lineColor; ctx.lineWidth = 1.5;
+  // Outer boundary
+  ctx.strokeRect(20, 10, w-40, h-20);
+  // Half-court line
+  ctx.beginPath(); ctx.moveTo(w/2, 10); ctx.lineTo(w/2, h-10); ctx.stroke();
+  // Center circle
+  ctx.beginPath(); ctx.arc(w/2, h/2, 36, 0, Math.PI*2); ctx.stroke();
+  // Left key
+  ctx.strokeRect(20, h/2-55, 110, 110);
+  // Right key
+  ctx.strokeRect(w-130, h/2-55, 110, 110);
+  // Left FT circle
+  ctx.beginPath(); ctx.arc(130, h/2, 36, 0, Math.PI*2); ctx.stroke();
+  // Right FT circle
+  ctx.beginPath(); ctx.arc(w-130, h/2, 36, 0, Math.PI*2); ctx.stroke();
+  // Left 3pt arc
+  ctx.beginPath(); ctx.arc(55, h/2, 120, -Math.PI*0.42, Math.PI*0.42); ctx.stroke();
+  // Right 3pt arc
+  ctx.beginPath(); ctx.arc(w-55, h/2, 120, Math.PI-Math.PI*0.42, Math.PI+Math.PI*0.42); ctx.stroke();
+}
 
 function drawCourt(ctx, w, h, dark, igHandle, xHandle) {
   // Fill court surface
@@ -2547,19 +2571,19 @@ function drawCourt(ctx, w, h, dark, igHandle, xHandle) {
   ctx.fillRect(0, 0, w, h);
 
   // Draw court lines from reference image, tinted for current theme
-  if (COURT_BG_LOADED || COURT_BG_IMG.complete) {
-    // Draw the PNG (assumed white/light lines on transparent) onto an offscreen canvas
-    // then tint it to the desired line color
+  if (!COURT_BG_FAILED && (COURT_BG_LOADED || COURT_BG_IMG.complete)) {
     const off = document.createElement("canvas");
     off.width = w; off.height = h;
     const ox = off.getContext("2d");
     ox.drawImage(COURT_BG_IMG, 0, 0, w, h);
-    // Tint: fill with line color using source-in so only opaque pixels are colored
     ox.globalCompositeOperation = "source-in";
     ox.fillStyle = dark ? "#FFFFFF" : "#111111";
     ox.fillRect(0, 0, w, h);
     ox.globalCompositeOperation = "source-over";
     ctx.drawImage(off, 0, 0);
+  } else {
+    // Fallback: draw basic court lines
+    drawCourtFallbackLines(ctx, w, h, dark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.2)");
   }
 
   // Social handles
@@ -2708,18 +2732,25 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
   const [history, setHistory]   = useState([]);
   const [histIdx, setHistIdx]   = useState(-1);
   const nextId = useRef(Date.now());
+  const [playerLimitMsg, setPlayerLimitMsg] = useState("");
+  const [courtImgFailed, setCourtImgFailed] = useState(false);
 
   const players  = play?.players  || [];
   const ball     = play?.ball     || null;
   const drawings = play?.stages?.[stageIdx]?.drawings || [];
+
+  // Prompt 1: count offensive/defensive
+  const offCount = players.filter(p=>!p.label.startsWith("X")).length;
+  const defCount = players.filter(p=>p.label.startsWith("X")).length;
 
   const pushHist = useCallback((newPlay) => {
     setHistory(prev => { const h=[...prev.slice(0,histIdx+1),newPlay]; setHistIdx(h.length-1); return h; });
     onUpdate && onUpdate(newPlay);
   }, [histIdx, onUpdate]);
 
+  // Prompt 6: undo silently ignores at beginning
   const undo = useCallback(() => {
-    if (histIdx<=0) return;
+    if (histIdx<=0) return; // silently do nothing
     const ni=histIdx-1;
     setHistIdx(ni);
     onUpdate && onUpdate(history[ni]);
@@ -2732,9 +2763,10 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
 
   useEffect(() => {
     redrawCourt();
-    if (!COURT_BG_LOADED) {
+    if (!COURT_BG_LOADED && !COURT_BG_FAILED) {
       const prev = COURT_BG_IMG.onload;
       COURT_BG_IMG.onload = () => { COURT_BG_LOADED = true; redrawCourt(); if(prev) prev(); };
+      COURT_BG_IMG.onerror = () => { COURT_BG_FAILED = true; redrawCourt(); };
     }
   }, [redrawCourt]);
 
@@ -2878,20 +2910,10 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
     if (dragging) { pushHist(play); setDragging(null); }
   };
 
-  const addPlayer = () => {
-    const n=players.length;
-    const labels=["1","2","3","4","5","X","G","F","C","D"];
-    const sp=[{x:140+n*30,y:200},{x:200,y:150},{x:200,y:250},{x:120,y:130},{x:120,y:270}];
-    const pos=sp[n]||{x:140+n*20,y:200};
-    const positions={};
-    const stageCount=play?.stages?.length||1;
-    for(let i=0;i<stageCount;i++) positions[i]={...pos};
-    const id=nextId.current++;
-    const newPlay={...play,players:[...players,{id,label:labels[n%labels.length],color:DRAW_COLORS[0],positions}]};
-    pushHist(newPlay);
-  };
+  // Prompt 1: addPlayer removed — use addOffensivePlayer/addDefensivePlayer instead
 
   const addBall = () => {
+    if (ball) return; // Prompt 3: only one ball
     const cx_=COURT_W/2, cy_=COURT_H/2;
     const positions={};
     const stageCount=play?.stages?.length||1;
@@ -2899,10 +2921,11 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
     pushHist({...play,ball:{positions}});
   };
 
+  // Prompt 2.1: deleteSelected only deletes screens and ball, not players
   const deleteSelected = () => {
     if (!selected) return;
     if (selected==="ball") { pushHist({...play,ball:null}); setSelected(null); return; }
-    // Check if it's a screen
+    // Check if it's a screen — only screens can be deleted individually
     const screenMatch = drawings.find(d=>d.id===selected&&d.type==="screen");
     if (screenMatch) {
       const newD=drawings.filter(d=>d.id!==selected);
@@ -2910,8 +2933,7 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
       setSelected(null);
       return;
     }
-    pushHist({...play,players:players.filter(p=>p.id!==selected)});
-    setSelected(null);
+    // Players cannot be deleted individually — silently do nothing
   };
 
   const rotateScreen = () => {
@@ -2923,28 +2945,28 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
 
   const addOffensivePlayer = useCallback(() => {
     if (readOnly) return;
+    if (offCount>=5) { setPlayerLimitMsg("Maximum 5 offensive players"); setTimeout(()=>setPlayerLimitMsg(""),2500); return; }
     const oLabels=["1","2","3","4","5"];
     const cx_=COURT_W/2, cy_=COURT_H/2;
-    const oCount=players.filter(p=>!p.label.startsWith("X")).length;
     const positions={};
     const stageCount=play?.stages?.length||1;
-    const offset=(oCount%5)*25-50;
+    const offset=(offCount%5)*25-50;
     for(let i=0;i<stageCount;i++) positions[i]={x:cx_+offset,y:cy_};
     const id=nextId.current++;
-    pushHist({...play,players:[...players,{id,label:oLabels[oCount%5],color:DRAW_COLORS[0],positions}]});
-  },[readOnly,players,play,pushHist]);
+    pushHist({...play,players:[...players,{id,label:oLabels[offCount],color:DRAW_COLORS[0],positions}]});
+  },[readOnly,players,play,pushHist,offCount]);
 
   const addDefensivePlayer = useCallback(() => {
     if (readOnly) return;
+    if (defCount>=5) { setPlayerLimitMsg("Maximum 5 defensive players"); setTimeout(()=>setPlayerLimitMsg(""),2500); return; }
     const cx_=COURT_W/2, cy_=COURT_H/2;
-    const dCount=players.filter(p=>p.label.startsWith("X")).length;
     const positions={};
     const stageCount=play?.stages?.length||1;
-    const offset=(dCount%5)*25-50;
+    const offset=(defCount%5)*25-50;
     for(let i=0;i<stageCount;i++) positions[i]={x:cx_+offset,y:cy_+30};
     const id=nextId.current++;
-    pushHist({...play,players:[...players,{id,label:"X"+(dCount+1),color:"#E06060",positions}]});
-  },[readOnly,players,play,pushHist]);
+    pushHist({...play,players:[...players,{id,label:"X"+(defCount+1),color:"#E06060",positions}]});
+  },[readOnly,players,play,pushHist,defCount]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -3019,12 +3041,21 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
             </div>
           </div>
           {/* Add elements row */}
-          <div style={{display:"flex",gap:7,alignItems:"center"}}>
+          <div style={{display:"flex",gap:7,alignItems:"center",flexWrap:"wrap"}}>
             <span style={{fontSize:11,fontWeight:700,color:C.textDim,textTransform:"uppercase",letterSpacing:.8}}>Add:</span>
-            <button onClick={addPlayer}
-              style={{padding:"4px 12px",borderRadius:7,border:`1px solid ${C.border}`,background:"transparent",
-                color:C.textMid,fontSize:12,fontWeight:700,cursor:"pointer"}}>
-              ● Player
+            <button onClick={addOffensivePlayer}
+              style={{padding:"4px 12px",borderRadius:7,border:`1px solid ${offCount>=5?"transparent":C.border}`,
+                background:offCount>=5?(dark?"rgba(255,255,255,0.04)":"#f5f5f5"):"transparent",
+                color:offCount>=5?C.textDim:C.textMid,fontSize:12,fontWeight:700,
+                cursor:offCount>=5?"not-allowed":"pointer",opacity:offCount>=5?0.5:1}}>
+              ● Offense ({offCount}/5)
+            </button>
+            <button onClick={addDefensivePlayer}
+              style={{padding:"4px 12px",borderRadius:7,border:`1px solid ${defCount>=5?"transparent":C.border}`,
+                background:defCount>=5?(dark?"rgba(255,255,255,0.04)":"#f5f5f5"):"transparent",
+                color:defCount>=5?C.textDim:"#E06060",fontSize:12,fontWeight:700,
+                cursor:defCount>=5?"not-allowed":"pointer",opacity:defCount>=5?0.5:1}}>
+              ✕ Defense ({defCount}/5)
             </button>
             {!ball && (
               <button onClick={addBall}
@@ -3032,6 +3063,9 @@ function PlayCanvas({ play, stageIdx, onUpdate, C, dark, readOnly, animProgress,
                   color:C.textMid,fontSize:12,fontWeight:700,cursor:"pointer"}}>
                 ◉ Ball
               </button>
+            )}
+            {playerLimitMsg && (
+              <span style={{fontSize:12,color:"#e07070",fontWeight:600,marginLeft:4}}>{playerLimitMsg}</span>
             )}
             <span style={{fontSize:12,color:C.textDim,marginLeft:4}}>
               {tool==="screen"?"Click court to place a screen.":"Drag players and ball to position them. Press Enter for next stage."}
@@ -3069,23 +3103,45 @@ function setStageDrawings(play, stageIdx, drawings) {
   return {...play,stages};
 }
 
+function clampToCourtBounds(pos, radius=14) {
+  return { x: Math.max(radius, Math.min(COURT_W-radius, pos.x)), y: Math.max(radius, Math.min(COURT_H-radius, pos.y)) };
+}
+
+function snapOverlap(play, movedId, stageIdx, pos) {
+  const players = play.players || [];
+  let adjusted = {...pos};
+  players.forEach(pl => {
+    if (pl.id === movedId) return;
+    const other = pl.positions?.[stageIdx] || pl.positions?.[0] || {x:0,y:0};
+    const dist = Math.hypot(adjusted.x - other.x, adjusted.y - other.y);
+    if (dist < 6) {
+      const angle = Math.atan2(adjusted.y - other.y, adjusted.x - other.x) || Math.PI/4;
+      adjusted = { x: other.x + Math.cos(angle)*16, y: other.y + Math.sin(angle)*16 };
+    }
+  });
+  return clampToCourtBounds(adjusted);
+}
+
 function moveElement(play, dragging, stageIdx, pos) {
   if (dragging.type==="ball") {
-    const positions={...play.ball?.positions,[stageIdx]:pos};
+    const clamped = clampToCourtBounds(pos, 10);
+    const positions={...play.ball?.positions,[stageIdx]:clamped};
     return {...play,ball:{...play.ball,positions}};
   }
   if (dragging.type==="player") {
+    const snapped = snapOverlap(play, dragging.id, stageIdx, pos);
     const players=play.players.map(pl=>{
       if (pl.id!==dragging.id) return pl;
-      return {...pl,positions:{...pl.positions,[stageIdx]:pos}};
+      return {...pl,positions:{...pl.positions,[stageIdx]:snapped}};
     });
     return {...play,players};
   }
   if (dragging.type==="screen") {
+    const clamped = clampToCourtBounds(pos, 15);
     const stages=[...(play.stages||[{}])];
     while (stages.length<=stageIdx) stages.push({drawings:[]});
     const drawings=(stages[stageIdx].drawings||[]).map(d=>
-      d.id===dragging.id?{...d,x:pos.x,y:pos.y}:d
+      d.id===dragging.id?{...d,x:clamped.x,y:clamped.y}:d
     );
     stages[stageIdx]={...stages[stageIdx],drawings};
     return {...play,stages};
@@ -3118,6 +3174,8 @@ function PlaybookBuilder({ C, dark }) {
   const [showIg, setShowIg]         = useState(false);
   const [showX, setShowX]           = useState(false);
   const animFrameRef = useRef(null);
+  const [playSpeed, setPlaySpeed] = useState(1);
+  const [loopPlay, setLoopPlay] = useState(false);
   // Prompt 9: walkthrough
   const [walkStep, setWalkStep] = useState(()=>{try{return localStorage.getItem("bam_pb_walkthrough_done")==="1"?-1:0;}catch{return 0;}});
   const [showHelp, setShowHelp] = useState(false);
@@ -3129,9 +3187,15 @@ function PlaybookBuilder({ C, dark }) {
   const dismissWalkthrough=()=>{setWalkStep(-1);try{localStorage.setItem("bam_pb_walkthrough_done","1");}catch{};};
   const reopenWalkthrough=()=>{setWalkStep(0);setShowHelp(false);};
 
+  const [bookError, setBookError] = useState("");
+
   const createBook = () => {
-    if (!newBookName.trim()) return;
-    const nb={id:Date.now(),title:newBookName.trim(),type:"Set Play",level:"All Levels",notes:"",
+    const name=newBookName.trim();
+    if (!name) { setBookError("Please enter a playbook name"); return; }
+    if (myBooks.length>=10) { setBookError("Maximum 10 playbooks reached"); return; }
+    if (myBooks.some(b=>b.title.toLowerCase()===name.toLowerCase())) { setBookError("A playbook with this name already exists"); return; }
+    setBookError("");
+    const nb={id:Date.now(),title:name,type:"Set Play",level:"All Levels",notes:"",
       plays:[{id:1,name:"Play 1",players:[],ball:null,stages:[{drawings:[]}]}],updatedAt:"just now"};
     setMyBooks(p=>[...p,nb]); setActiveBook(nb); setActivePlayIdx(0); setStageIdx(0);
     setNewBookName(""); setShowNewBook(false); setView("editor");
@@ -3148,6 +3212,7 @@ function PlaybookBuilder({ C, dark }) {
 
   const addPlay=()=>{
     if(!activeBook) return;
+    if(activeBook.plays.length>=15) return; // 15 plays per playbook cap
     const np={id:Date.now(),name:`Play ${activeBook.plays.length+1}`,players:[],ball:null,stages:[{drawings:[]}]};
     const updated={...activeBook,plays:[...activeBook.plays,np],updatedAt:"just now"};
     updateBook(updated); setActivePlayIdx(updated.plays.length-1); setStageIdx(0);
@@ -3155,9 +3220,10 @@ function PlaybookBuilder({ C, dark }) {
 
   const addStage=()=>{
     if(!activeBook||!currentPlay) return;
+    if((currentPlay.stages?.length||1)>=20) return; // 20-stage cap
+    if((currentPlay.players||[]).length===0) return; // must have players first
     // Clone player/ball positions from current stage into new stage
     const newStages=[...currentPlay.stages,{drawings:[]}];
-    // For each player, add position for new stage = same as current
     const newStageIdx=newStages.length-1;
     const players=(currentPlay.players||[]).map(pl=>{
       const curPos=pl.positions?.[stageIdx]||pl.positions?.[0]||{x:100,y:200};
@@ -3174,10 +3240,40 @@ function PlaybookBuilder({ C, dark }) {
 
   const deleteStage=()=>{
     if(!activeBook||!currentPlay||currentPlay.stages.length<=1) return;
-    const newStages=currentPlay.stages.filter((_,i)=>i!==stageIdx);
-    const newIdx=Math.max(0,stageIdx-1);
-    updatePlay(currentPlay.id,{...currentPlay,stages:newStages});
+    const delIdx=stageIdx;
+    const newStages=currentPlay.stages.filter((_,i)=>i!==delIdx);
+    // Re-index player positions: shift all indices above delIdx down by 1
+    const players=(currentPlay.players||[]).map(pl=>{
+      const newPos={};
+      Object.keys(pl.positions||{}).forEach(k=>{
+        const ki=parseInt(k);
+        if(ki<delIdx) newPos[ki]=pl.positions[k];
+        else if(ki>delIdx) newPos[ki-1]=pl.positions[k];
+        // ki===delIdx is dropped
+      });
+      return {...pl,positions:newPos};
+    });
+    let ball=currentPlay.ball;
+    if(ball){
+      const newPos={};
+      Object.keys(ball.positions||{}).forEach(k=>{
+        const ki=parseInt(k);
+        if(ki<delIdx) newPos[ki]=ball.positions[k];
+        else if(ki>delIdx) newPos[ki-1]=ball.positions[k];
+      });
+      ball={...ball,positions:newPos};
+    }
+    const newIdx=Math.max(0,delIdx-1);
+    updatePlay(currentPlay.id,{...currentPlay,players,ball,stages:newStages});
     setStageIdx(newIdx);
+  };
+
+  const stopAnimRef = useRef(false);
+
+  const stopAnimation=()=>{
+    stopAnimRef.current=true;
+    if(animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    setAnimProgress(null); setPrevStageObjs(null); setIsAnimating(false);
   };
 
   // Animate between stages with easing
@@ -3185,13 +3281,13 @@ function PlaybookBuilder({ C, dark }) {
     if(isAnimating||!currentPlay) return;
     const totalStages=currentPlay.stages.length;
     if(totalStages<2) return;
+    stopAnimRef.current=false;
     setIsAnimating(true);
     let s=0;
     setStageIdx(0);
 
     const runStage=(fromIdx,toIdx)=>{
-      const prev=currentPlay;
-      // Snapshot prev positions
+      if(stopAnimRef.current) return;
       const ppos={};
       (currentPlay.players||[]).forEach(pl=>{
         ppos[pl.id]=pl.positions?.[fromIdx]||pl.positions?.[0]||{x:100,y:200};
@@ -3202,8 +3298,11 @@ function PlaybookBuilder({ C, dark }) {
       });
       setStageIdx(toIdx);
 
-      const duration=2500, start=performance.now();
+      const baseDuration=2500;
+      const duration=baseDuration/playSpeed;
+      const start=performance.now();
       const frame=(now)=>{
+        if(stopAnimRef.current) return;
         const raw=Math.min((now-start)/duration,1);
         const eased=easeInOut(raw);
         setAnimProgress(eased);
@@ -3214,7 +3313,9 @@ function PlaybookBuilder({ C, dark }) {
           setPrevStageObjs(null);
           s=toIdx;
           if(s<totalStages-1) {
-            setTimeout(()=>runStage(s,s+1),400);
+            setTimeout(()=>runStage(s,s+1),400/playSpeed);
+          } else if(loopPlay) {
+            setTimeout(()=>{s=0;setStageIdx(0);runStage(0,1);},600/playSpeed);
           } else {
             setIsAnimating(false);
           }
@@ -3354,13 +3455,21 @@ function PlaybookBuilder({ C, dark }) {
       {view==="mine"&&(
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:16}}>
           {!showNewBook?(
-            <div onClick={()=>setShowNewBook(true)}
-              style={{border:`2px dashed ${C.border}`,borderRadius:14,padding:28,cursor:"pointer",
+            myBooks.length<10?(
+              <div onClick={()=>setShowNewBook(true)}
+                style={{border:`2px dashed ${C.border}`,borderRadius:14,padding:28,cursor:"pointer",
+                  display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+                  gap:8,minHeight:150,color:C.textDim}}>
+                <div style={{fontSize:28}}>+</div>
+                <div style={{fontWeight:700,fontSize:13}}>New Playbook</div>
+              </div>
+            ):(
+              <div style={{border:`2px dashed ${C.border}`,borderRadius:14,padding:28,
                 display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
-                gap:8,minHeight:150,color:C.textDim}}>
-              <div style={{fontSize:28}}>+</div>
-              <div style={{fontWeight:700,fontSize:13}}>New Playbook</div>
-            </div>
+                gap:8,minHeight:150,color:C.textDim,opacity:0.5}}>
+                <div style={{fontSize:14,fontWeight:700}}>Playbook limit reached (10)</div>
+              </div>
+            )
           ):(
             <div style={{border:`1px solid ${GOLD}`,borderRadius:14,padding:18,
               background:dark?"#1E1E1E":"#fff",display:"flex",flexDirection:"column",gap:9}}>
@@ -3369,10 +3478,11 @@ function PlaybookBuilder({ C, dark }) {
                 onKeyDown={e=>e.key==="Enter"&&createBook()} placeholder="Playbook name..." autoFocus
                 style={{padding:"8px 12px",borderRadius:8,border:`1px solid ${C.border}`,
                   background:dark?"#111":"#f5f5f5",color:C.text,fontSize:13,outline:"none"}}/>
+              {bookError&&<div style={{fontSize:12,color:"#e07070",fontWeight:600}}>{bookError}</div>}
               <div style={{display:"flex",gap:8}}>
                 <button onClick={createBook}
                   style={{flex:1,padding:"8px",borderRadius:8,border:"none",background:GOLD,color:"#111",fontWeight:800,cursor:"pointer",fontSize:13}}>Create</button>
-                <button onClick={()=>{setShowNewBook(false);setNewBookName("");}}
+                <button onClick={()=>{setShowNewBook(false);setNewBookName("");setBookError("");}}
                   style={{padding:"8px 12px",borderRadius:8,border:`1px solid ${C.border}`,background:"transparent",color:C.textDim,cursor:"pointer",fontSize:13}}>Cancel</button>
               </div>
             </div>
@@ -3511,9 +3621,11 @@ function PlaybookBuilder({ C, dark }) {
               <div style={{padding:"10px 12px",borderBottom:`1px solid ${C.border}`,
                 display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <div style={{fontSize:11,fontWeight:800,color:C.textDim,letterSpacing:.8,textTransform:"uppercase"}}>Plays</div>
-                <button onClick={addPlay}
-                  style={{width:20,height:20,borderRadius:"50%",background:GOLD,border:"none",cursor:"pointer",
-                    fontSize:15,fontWeight:900,color:"#111",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>+</button>
+                {activeBook.plays.length<15&&(
+                  <button onClick={addPlay}
+                    style={{width:20,height:20,borderRadius:"50%",background:GOLD,border:"none",cursor:"pointer",
+                      fontSize:15,fontWeight:900,color:"#111",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>+</button>
+                )}
               </div>
               {activeBook.plays.map((play,idx)=>(
                 <div key={play.id} onClick={()=>{setActivePlayIdx(idx);setStageIdx(0);}}
@@ -3542,11 +3654,12 @@ function PlaybookBuilder({ C, dark }) {
                 <div style={{marginBottom:10,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
                   <input value={currentPlay.name}
                     onChange={e=>updatePlay(currentPlay.id,{...currentPlay,name:e.target.value})}
+                    placeholder="Name this play..."
                     style={{fontSize:17,fontWeight:800,color:C.text,background:"transparent",border:"none",
-                      outline:"none",borderBottom:`2px solid ${dark?"#333":"#ddd"}`,padding:"2px 4px",
+                      outline:"none",borderBottom:`2px solid ${!currentPlay.name.trim()?"#e07070":(dark?"#333":"#ddd")}`,padding:"2px 4px",
                       minWidth:150,transition:"border-color .2s"}}
-                    onFocus={e=>e.target.style.borderBottomColor=GOLD}
-                    onBlur={e=>e.target.style.borderBottomColor=dark?"#333":"#ddd"}/>
+                    onFocus={e=>e.target.style.borderBottomColor=!currentPlay.name.trim()?"#e07070":GOLD}
+                    onBlur={e=>e.target.style.borderBottomColor=!currentPlay.name.trim()?"#e07070":(dark?"#333":"#ddd")}/>
 
                   <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:6}}>
                     <span style={{fontSize:12,color:C.textDim,fontWeight:600}}>Stages:</span>
@@ -3559,21 +3672,47 @@ function PlaybookBuilder({ C, dark }) {
                           {i+1}
                         </button>
                       ))}
-                      <button onClick={addStage}
-                        style={{width:28,height:28,borderRadius:7,border:`1px dashed ${C.border}`,
-                          background:"transparent",color:C.textDim,fontSize:16,cursor:"pointer",lineHeight:1,fontWeight:700}}>+</button>
+                      {totalStages<20&&(currentPlay.players||[]).length>0&&(
+                        <button onClick={addStage}
+                          style={{width:28,height:28,borderRadius:7,border:`1px dashed ${C.border}`,
+                            background:"transparent",color:C.textDim,fontSize:16,cursor:"pointer",lineHeight:1,fontWeight:700}}>+</button>
+                      )}
                       {totalStages>1&&(
                         <button onClick={deleteStage}
                           style={{width:28,height:28,borderRadius:7,border:`1px solid ${dark?"#333":"#ddd"}`,
                             background:"transparent",color:"#e07070",fontSize:12,cursor:"pointer",fontWeight:700}}>−</button>
                       )}
                     </div>
-                    <button onClick={animatePlay} disabled={isAnimating||totalStages<2}
-                      style={{padding:"5px 14px",borderRadius:8,border:"none",cursor:totalStages<2?"not-allowed":"pointer",
-                        fontWeight:800,fontSize:12,transition:"opacity .2s",
-                        background:isAnimating||totalStages<2?"#333":GOLD,
-                        color:"#111",opacity:isAnimating||totalStages<2?0.5:1}}>
-                      {isAnimating?"▶ Playing…":"▶ Play"}
+                    {isAnimating?(
+                      <button onClick={stopAnimation}
+                        style={{padding:"5px 14px",borderRadius:8,border:"none",cursor:"pointer",
+                          fontWeight:800,fontSize:12,background:"#e07070",color:"#fff"}}>
+                        ■ Stop
+                      </button>
+                    ):(
+                      <button onClick={animatePlay} disabled={totalStages<2}
+                        style={{padding:"5px 14px",borderRadius:8,border:"none",cursor:totalStages<2?"not-allowed":"pointer",
+                          fontWeight:800,fontSize:12,transition:"opacity .2s",
+                          background:totalStages<2?"#333":GOLD,
+                          color:"#111",opacity:totalStages<2?0.5:1}}>
+                        ▶ Play
+                      </button>
+                    )}
+                    <div style={{display:"flex",gap:2,marginLeft:4}}>
+                      {[0.5,1,2].map(sp=>(
+                        <button key={sp} onClick={()=>setPlaySpeed(sp)}
+                          style={{padding:"3px 7px",borderRadius:5,border:`1px solid ${playSpeed===sp?GOLD:C.border}`,
+                            background:playSpeed===sp?`${GOLD}22`:"transparent",
+                            color:playSpeed===sp?GOLD:C.textDim,fontSize:10,fontWeight:700,cursor:"pointer"}}>
+                          {sp}x
+                        </button>
+                      ))}
+                    </div>
+                    <button onClick={()=>setLoopPlay(l=>!l)}
+                      style={{padding:"3px 8px",borderRadius:5,border:`1px solid ${loopPlay?GOLD:C.border}`,
+                        background:loopPlay?`${GOLD}22`:"transparent",
+                        color:loopPlay?GOLD:C.textDim,fontSize:10,fontWeight:700,cursor:"pointer"}}>
+                      {loopPlay?"🔁 Loop":"→ Once"}
                     </button>
                   </div>
                 </div>
@@ -3586,10 +3725,11 @@ function PlaybookBuilder({ C, dark }) {
                   animProgress={animProgress}
                   prevStageObjs={prevStageObjs}
                   igHandle={igHandle} xHandle={xHandle}
+                  readOnly={isAnimating}
                   onNextStage={()=>{
                     const total=currentPlay?.stages?.length||1;
                     if(stageIdx<total-1) setStageIdx(stageIdx+1);
-                    else addStage();
+                    else if((currentPlay.players||[]).length>0&&total<20) addStage();
                   }}
                 />
 
@@ -3657,9 +3797,9 @@ function PlaybookBuilder({ C, dark }) {
           </div>
         </div>
       )}
-      {/* Prompt 9: Help button */}
+      {/* Prompt 9: Help button — always visible in editor */}
       {view==="editor"&&walkStep===-1&&(
-        <div className="btn" onClick={reopenWalkthrough}
+        <div onClick={reopenWalkthrough}
           style={{position:"fixed",bottom:24,right:24,width:36,height:36,borderRadius:"50%",background:GOLD,color:"#111",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:800,boxShadow:`0 4px 14px ${GOLD}44`,zIndex:100,cursor:"pointer"}}>
           ?
         </div>
