@@ -271,6 +271,7 @@ const css = `
 @keyframes pinDrop{0%{transform:translateY(-20px) scale(0.4);opacity:0;}70%{transform:translateY(3px) scale(1.15);}100%{transform:translateY(0) scale(1);opacity:1;}}
 @keyframes pinPing{0%{transform:scale(1);opacity:.7;}100%{transform:scale(2.8);opacity:0;}}
 @keyframes mapFadeIn{from{opacity:0;transform:scale(0.97);}to{opacity:1;transform:scale(1);}}
+@keyframes livePulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.7;transform:scale(1.05);}}
 .map-pin:hover .pin-label{opacity:1!important;transform:translateY(0)!important;}
 @keyframes microDrop{0%{opacity:0;transform:scale(0.3) translateY(-18px);}60%{opacity:1;transform:scale(1.18) translateY(2px);}80%{transform:scale(0.94) translateY(0);}100%{opacity:1;transform:scale(1) translateY(0);}}
 @keyframes ringPulse{0%{transform:scale(0.6);opacity:.7;}100%{transform:scale(3.2);opacity:0;}}
@@ -1478,7 +1479,7 @@ function SearchBar({C}){
 }
 
 // ── POST CARD ──────────────────────────────────────────────────────────────
-function PostCard({p,C,dark,compact,onTagClick,activeTag,onProfileClick,showLikeHint}){
+function PostCard({p,C,dark,compact,onTagClick,activeTag,onProfileClick,showLikeHint,onDelete}){
   const [lk,setLk]=useState(false);
   const [la,setLa]=useState(false);
   const [open,setOpen]=useState(false);
@@ -1488,6 +1489,8 @@ function PostCard({p,C,dark,compact,onTagClick,activeTag,onProfileClick,showLike
   const [memberOpen,setMemberOpen]=useState(false);
   const [lastTap,setLastTap]=useState(0);
   const [hintVis,setHintVis]=useState(!!showLikeHint);
+  const [showDeleteModal,setShowDeleteModal]=useState(false);
+  const [deleted,setDeleted]=useState(false);
   useEffect(()=>{if(showLikeHint){const t=setTimeout(()=>setHintVis(false),3000);return()=>clearTimeout(t);}},[showLikeHint]);
   const nameRef=useRef(null);
   const ac=getAC(p.author);
@@ -1496,12 +1499,20 @@ function PostCard({p,C,dark,compact,onTagClick,activeTag,onProfileClick,showLike
 
   const like=()=>{ setLk(v=>!v); setLa(true); setTimeout(()=>setLa(false),420); };
   const submitReply=()=>{ if(!replyText.trim()) return; setReplies(r=>[...r,replyText.trim()]); setReply(""); };
+  const tapCount=useRef(0);
+  const tapTimer=useRef(null);
 
   const handleDoubleTap=()=>{
-    const now=Date.now();
-    if(now-lastTap<300){ if(!lk) like(); }
-    setLastTap(now);
+    tapCount.current++;
+    if(tapTimer.current) clearTimeout(tapTimer.current);
+    tapTimer.current=setTimeout(()=>{tapCount.current=0;},400);
+    if(tapCount.current===2){ if(!lk){like();} tapCount.current=0; }
+    else if(tapCount.current>=3){ tapCount.current=0; }
   };
+
+  const fmtLikes=(n)=>{if(n>=10000) return Math.floor(n/1000)+"k"; if(n>=1000){const k=n/1000;return k%1===0?k+"k":k.toFixed(1)+"k";} return n;};
+
+  if(deleted) return null;
 
   const avatar = (
     <div className="btn" onClick={e=>{e.stopPropagation();onProfileClick&&onProfileClick(p.author);}}
@@ -1519,8 +1530,21 @@ function PostCard({p,C,dark,compact,onTagClick,activeTag,onProfileClick,showLike
       style={{background:C.bgCard,border:`1px solid ${C.border}`,borderLeft:`3px solid ${border}`,
         borderRadius:11,padding:compact?"14px 16px":"20px 22px",marginBottom:12,
         boxShadow:dark?"none":`0 2px 8px ${C.shadow}`,"--hs":`0 6px 22px ${C.shadow}`,
-        userSelect:"none",cursor:"default"}}>
+        userSelect:"none",cursor:"default",position:"relative"}}>
       {memberOpen&&<MemberCard name={p.author} anchorRef={nameRef} C={C} dark={dark} onClose={()=>setMemberOpen(false)}/>}
+      {/* Delete confirmation modal */}
+      {showDeleteModal&&(
+        <div onClick={e=>e.stopPropagation()} style={{position:"fixed",inset:0,zIndex:5000,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div style={{background:dark?"#1A1A1A":"#fff",borderRadius:14,padding:"28px 32px",maxWidth:360,textAlign:"center",border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:16,fontWeight:800,color:C.text,marginBottom:8}}>Delete this post?</div>
+            <div style={{fontSize:13,color:C.textDim,marginBottom:22,lineHeight:1.6}}>All comments will also be removed.</div>
+            <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+              <button onClick={()=>setShowDeleteModal(false)} style={{padding:"8px 24px",borderRadius:8,fontSize:13,fontWeight:700,background:"transparent",color:C.textMid,border:`1px solid ${C.border}`,cursor:"pointer"}}>Cancel</button>
+              <button onClick={()=>{setShowDeleteModal(false);setDeleted(true);onDelete&&onDelete(p.id);}} style={{padding:"8px 24px",borderRadius:8,fontSize:13,fontWeight:700,background:"#E06060",color:"#fff",border:"none",cursor:"pointer"}}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Author row */}
       <div style={{display:"flex",gap:12,alignItems:"flex-start",marginBottom:10}}>
@@ -1537,6 +1561,7 @@ function PostCard({p,C,dark,compact,onTagClick,activeTag,onProfileClick,showLike
           </div>
         </div>
         <div className="tag-pill" onClick={e=>{e.stopPropagation();onTagClick&&onTagClick(p.tag);}} style={{fontSize:11,fontWeight:700,color:"#111",background:GOLD,padding:"4px 11px",borderRadius:20,flexShrink:0,opacity:activeTag&&activeTag!==p.tag?0.4:1}}>{p.tag}</div>
+        {onDelete&&<div className="btn" onClick={e=>{e.stopPropagation();setShowDeleteModal(true);}} style={{width:28,height:28,borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center",color:C.textDim,fontSize:16,lineHeight:1,background:"transparent",flexShrink:0}}>⋯</div>}
       </div>
 
       {/* Title */}
@@ -1544,7 +1569,14 @@ function PostCard({p,C,dark,compact,onTagClick,activeTag,onProfileClick,showLike
 
       {/* Body */}
       <div style={{fontSize:15,color:C.textMid,lineHeight:1.75,marginBottom:12}}>
-        {compact?p.content.slice(0,105)+"...":p.content}
+        {compact?p.content.slice(0,105)+"...":(()=>{
+          const urlRe=/(https?:\/\/[^\s]+)/g;
+          const parts=p.content.split(urlRe);
+          return parts.map((part,i)=>urlRe.lastIndex=0||part.match(/^https?:\/\//)
+            ?<a key={i} href={part} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()} style={{color:GOLD,textDecoration:"underline",wordBreak:"break-all"}}>{part}</a>
+            :<span key={i}>{part}</span>
+          );
+        })()}
       </div>
 
       {/* Inline media */}
@@ -1580,7 +1612,7 @@ function PostCard({p,C,dark,compact,onTagClick,activeTag,onProfileClick,showLike
               style={{position:"relative",display:"flex",alignItems:"center",gap:6,fontSize:13,color:lk?GOLD:C.textDim,
                 fontWeight:lk?700:400,userSelect:"none",padding:"5px 10px",borderRadius:8,
                 background:lk?(dark?"rgba(226,221,159,0.1)":"rgba(226,221,159,0.15)"):"transparent"}}>
-              <Ic.Heart c={lk?GOLD:C.textDim} f={lk} s={15}/>{p.likes+(lk?1:0)}
+              <Ic.Heart c={lk?GOLD:C.textDim} f={lk} s={15}/>{fmtLikes(p.likes+(lk?1:0))}
               {hintVis&&<div style={{position:"absolute",top:"100%",left:0,fontSize:10,color:C.textDim,opacity:0.45,fontStyle:"italic",whiteSpace:"nowrap",marginTop:2}}>double-tap to like</div>}
             </span>
             <span className="btn" onClick={e=>{e.stopPropagation();setOpen(v=>!v);}}
@@ -1598,17 +1630,34 @@ function PostCard({p,C,dark,compact,onTagClick,activeTag,onProfileClick,showLike
             transition:"max-height 0.35s cubic-bezier(0.4,0,0.2,1)",
           }}>
             <div style={{paddingTop:14}}>
-              {replies.map((r,i)=>(
-                <div key={i} style={{display:"flex",gap:10,marginBottom:10,alignItems:"flex-start"}}>
-                  <div style={{width:28,height:28,borderRadius:"50%",background:C.bgHover,border:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,color:C.textDim,flexShrink:0}}>?</div>
-                  <div style={{background:C.bgHover,borderRadius:9,padding:"9px 13px",fontSize:13,color:C.textMid,lineHeight:1.6,flex:1}}>{r}</div>
-                </div>
-              ))}
+              {replies.map((r,i)=>{
+                const CommentBubble=()=>{
+                  const [expanded,setExpanded]=useState(false);
+                  const isLong=r.length>180;
+                  return (
+                    <div style={{background:C.bgHover,borderRadius:9,padding:"9px 13px",fontSize:13,color:C.textMid,lineHeight:1.6,flex:1,position:"relative",overflow:"hidden",
+                      ...(!expanded&&isLong?{maxHeight:62}:{})}}>
+                      {r}
+                      {isLong&&!expanded&&(
+                        <div style={{position:"absolute",bottom:0,left:0,right:0,height:28,background:`linear-gradient(transparent,${dark?"#2E2E2E":"#F5F5F5"})`,display:"flex",alignItems:"flex-end",justifyContent:"flex-end",paddingRight:8,paddingBottom:2}}>
+                          <span className="btn" onClick={e=>{e.stopPropagation();setExpanded(true);}} style={{fontSize:11,fontWeight:700,color:GOLD,cursor:"pointer"}}>Read more</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                };
+                return (
+                  <div key={i} style={{display:"flex",gap:10,marginBottom:10,alignItems:"flex-start"}}>
+                    <div style={{width:28,height:28,borderRadius:"50%",background:C.bgHover,border:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,color:C.textDim,flexShrink:0}}>?</div>
+                    <CommentBubble/>
+                  </div>
+                );
+              })}
               <div style={{display:"flex",gap:9,alignItems:"center",marginTop:4}}>
                 <div style={{width:28,height:28,borderRadius:"50%",background:GOLD,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,color:"#1A1A1A",flexShrink:0}}>CA</div>
                 <div style={{flex:1,display:"flex",alignItems:"center",gap:8,background:C.bgHover,borderRadius:9,padding:"8px 13px",border:`1px solid ${C.border}`}}>
                   <input value={replyText} onChange={e=>setReply(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submitReply()} onClick={e=>e.stopPropagation()} placeholder="Add a reply..." style={{flex:1,background:"transparent",border:"none",outline:"none",fontSize:13,color:C.text,fontFamily:"'DM Sans',sans-serif"}}/>
-                  <span className="btn" onClick={e=>{e.stopPropagation();submitReply();}}><Ic.Send c={replyText.trim()?GOLD:C.textDim} s={14}/></span>
+                  <span className="btn" onClick={e=>{e.stopPropagation();submitReply();}} style={{opacity:replyText.trim()?1:0.4,pointerEvents:replyText.trim()?"auto":"none"}}><Ic.Send c={replyText.trim()?GOLD:C.textDim} s={14}/></span>
                 </div>
               </div>
             </div>
@@ -3338,22 +3387,36 @@ function MemberMapOverlay({C, dark, onClose, onProfileClick}) {
                     style={{transition:"all .2s"}}/>
 
                   {/* Body */}
-                  <circle cx={pin.x} cy={pin.y} r={isOpen?9:isHov?8.5:7}
-                    fill={isOpen||isHov?GOLD:"#1E1A0E"}
-                    stroke={GOLD} strokeWidth={isOpen||isHov?0:1.4}
-                    style={{
-                      animation:`pinDrop .5s cubic-bezier(.34,1.56,.64,1) ${pin.delay}ms both`,
-                      transition:"fill .15s",
-                    }}/>
-
-                  {/* Initials */}
-                  <text x={pin.x} y={pin.y+2.8} textAnchor="middle"
-                    fontSize={isOpen||isHov?"6.5":"5.8"} fontWeight="800"
-                    fontFamily="DM Sans,sans-serif"
-                    fill={isOpen||isHov?"#111":GOLD}
-                    style={{pointerEvents:"none"}}>
-                    {pin.initials}
-                  </text>
+                  {(()=>{
+                    const mem=MEMBERS[pin.name];
+                    const hasPhoto=mem?.photo;
+                    const r=isOpen?9:isHov?8.5:7;
+                    const clipId=`pin-clip-${i}`;
+                    return hasPhoto?(
+                      <>
+                        <defs><clipPath id={clipId}><circle cx={pin.x} cy={pin.y} r={r}/></clipPath></defs>
+                        <image href={mem.photo} x={pin.x-r} y={pin.y-r} width={r*2} height={r*2}
+                          clipPath={`url(#${clipId})`} preserveAspectRatio="xMidYMid slice"
+                          style={{animation:`pinDrop .5s cubic-bezier(.34,1.56,.64,1) ${pin.delay}ms both`}}/>
+                        <circle cx={pin.x} cy={pin.y} r={r} fill="none" stroke={GOLD}
+                          strokeWidth={isOpen||isHov?1.5:1.2} style={{transition:"all .15s"}}/>
+                      </>
+                    ):(
+                      <>
+                        <circle cx={pin.x} cy={pin.y} r={r}
+                          fill={isOpen||isHov?GOLD:"#1E1A0E"}
+                          stroke={GOLD} strokeWidth={isOpen||isHov?0:1.4}
+                          style={{animation:`pinDrop .5s cubic-bezier(.34,1.56,.64,1) ${pin.delay}ms both`,transition:"fill .15s"}}/>
+                        <text x={pin.x} y={pin.y+2.8} textAnchor="middle"
+                          fontSize={isOpen||isHov?"6.5":"5.8"} fontWeight="800"
+                          fontFamily="DM Sans,sans-serif"
+                          fill={isOpen||isHov?"#111":GOLD}
+                          style={{pointerEvents:"none"}}>
+                          {pin.initials}
+                        </text>
+                      </>
+                    );
+                  })()}
                 </g>
               );
             })}
@@ -3558,7 +3621,9 @@ function OnboardingFlow({onComplete,onTourStart}){
   const [goal1yr,setGoal1yr]=useState("");
   const [goal10yr,setGoal10yr]=useState("");
   const [bio,setBio]=useState("");
+  const [profilePhoto,setProfilePhoto]=useState(null);
   const [showLeaveModal,setShowLeaveModal]=useState(false);
+  const photoInputRef=useRef(null);
 
   // Prompt 1: Back button interception
   useEffect(()=>{
@@ -3611,7 +3676,7 @@ function OnboardingFlow({onComplete,onTourStart}){
   },[firstName,country,city,effectiveRoles,experience,ageGroups,separates,goal1yr,goal10yr]);
 
   useEffect(()=>{
-    if(screen===4) generateBio();
+    if(screen===5) generateBio();
   },[screen,generateBio]);
 
   const finish=()=>{
@@ -3725,7 +3790,7 @@ function OnboardingFlow({onComplete,onTourStart}){
       <style>{ONBOARDING_CSS}</style>
       {leaveModal}
       <div className="ob-fade" style={{textAlign:"center",padding:40,width:"100%",maxWidth:540}}>
-        {progress(0,4)}
+        {progress(0,5)}
         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:38,color:"#F5F0E8",letterSpacing:2,marginBottom:8}}>LET'S LEARN A BIT ABOUT YOU</div>
         <div style={{fontSize:13,color:"#4A4840",marginBottom:32}}>Step 1 of 4</div>
         <div style={{width:"100%",maxWidth:420,margin:"0 auto",textAlign:"left"}}>
@@ -3785,7 +3850,7 @@ function OnboardingFlow({onComplete,onTourStart}){
       <style>{ONBOARDING_CSS}</style>
       {leaveModal}
       <div className="ob-fade" style={{textAlign:"center",padding:40,width:"100%",maxWidth:540}}>
-        {progress(1,4)}
+        {progress(1,5)}
         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,color:"#F5F0E8",letterSpacing:2,marginBottom:8}}>YOUR COACHING STORY</div>
         <div style={{fontSize:13,color:"#4A4840",marginBottom:32}}>Step 2 of 4</div>
         <div style={{fontSize:13,color:"#9A9488",marginBottom:12,textAlign:"left"}}>How long have you been coaching?</div>
@@ -3809,16 +3874,60 @@ function OnboardingFlow({onComplete,onTourStart}){
     </div>
   );
 
-  // Screen 3: Coaching identity (Prompt 7: 20-500 char validation)
-  const id3Valid=separates.trim().length>=20&&goal1yr.trim().length>=20&&goal10yr.trim().length>=20;
+  // Screen 3: Profile photo upload
+  const handlePhotoUpload=(e)=>{
+    const file=e.target.files?.[0];
+    if(!file) return;
+    if(file.size>5*1024*1024) return; // 5MB max
+    const reader=new FileReader();
+    reader.onload=(ev)=>setProfilePhoto(ev.target.result);
+    reader.readAsDataURL(file);
+  };
   if(screen===3) return (
     <div style={wrap}>
       <style>{ONBOARDING_CSS}</style>
       {leaveModal}
       <div className="ob-fade" style={{textAlign:"center",padding:40,width:"100%",maxWidth:540}}>
-        {progress(2,4)}
+        {progress(2,5)}
+        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,color:"#F5F0E8",letterSpacing:2,marginBottom:8}}>YOUR PHOTO</div>
+        <div style={{fontSize:13,color:"#4A4840",marginBottom:32}}>Step 3 of 5 — optional but recommended</div>
+        <div onClick={()=>photoInputRef.current?.click()} className="btn" style={{width:120,height:120,borderRadius:"50%",margin:"0 auto 20px",
+          background:profilePhoto?"transparent":"#242420",border:`2px dashed ${profilePhoto?GOLD:"#444"}`,
+          display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",cursor:"pointer",
+          boxShadow:profilePhoto?`0 4px 20px ${GOLD}33`:"none",transition:"all .2s"}}>
+          {profilePhoto
+            ?<img src={profilePhoto} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>
+            :<div style={{textAlign:"center"}}>
+              <div style={{fontSize:32,marginBottom:4,opacity:.5}}>📷</div>
+              <div style={{fontSize:10,color:"#666"}}>Tap to upload</div>
+            </div>
+          }
+        </div>
+        <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoUpload} style={{display:"none"}}/>
+        {profilePhoto&&<div className="btn" onClick={()=>setProfilePhoto(null)} style={{fontSize:12,color:"#E06060",marginBottom:8,cursor:"pointer"}}>Remove</div>}
+        {!profilePhoto&&(
+          <div style={{width:120,height:120,borderRadius:"50%",margin:"0 auto",background:getAC(firstName||"U"),
+            display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,fontWeight:800,color:"#fff",
+            boxShadow:`0 4px 20px ${getAC(firstName||"U")}55`,marginTop:-8,opacity:.5}}>
+            {(firstName?.[0]||"").toUpperCase()}{(lastName?.[0]||"").toUpperCase()||""}
+          </div>
+        )}
+        {!profilePhoto&&<div style={{fontSize:11,color:"#4A4840",marginTop:8,fontStyle:"italic"}}>This is your fallback avatar</div>}
+        {ctaBtn(profilePhoto?"NEXT":"SKIP",()=>setScreen(4))}
+      </div>
+    </div>
+  );
+
+  // Screen 4: Coaching identity (20-500 char validation)
+  const id3Valid=separates.trim().length>=20&&goal1yr.trim().length>=20&&goal10yr.trim().length>=20;
+  if(screen===4) return (
+    <div style={wrap}>
+      <style>{ONBOARDING_CSS}</style>
+      {leaveModal}
+      <div className="ob-fade" style={{textAlign:"center",padding:40,width:"100%",maxWidth:540}}>
+        {progress(3,5)}
         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,color:"#F5F0E8",letterSpacing:2,marginBottom:8}}>WHAT DRIVES YOU</div>
-        <div style={{fontSize:13,color:"#4A4840",marginBottom:32}}>Step 3 of 4</div>
+        <div style={{fontSize:13,color:"#4A4840",marginBottom:32}}>Step 4 of 5</div>
         <div style={{textAlign:"left",marginBottom:14}}>
           <div style={{fontSize:13,color:"#9A9488",marginBottom:8}}>What separates you as a coach?</div>
           <textarea className="ob-input" placeholder="Be honest. What do you do differently?" value={separates}
@@ -3840,19 +3949,19 @@ function OnboardingFlow({onComplete,onTourStart}){
             style={{...inputStyle,height:64,resize:"none",marginBottom:0}}/>
           {charCount(goal10yr,20,500)}
         </div>
-        {ctaBtn("NEXT",()=>setScreen(4),!id3Valid)}
+        {ctaBtn("NEXT",()=>setScreen(5),!id3Valid)}
       </div>
     </div>
   );
 
-  // Screen 4: Bio generation (Prompt 8: editable, regenerate, 600 char limit)
+  // Screen 5: Bio generation (editable, regenerate, 600 char limit)
   const bioOverLimit=bio.length>600;
-  if(screen===4) return (
+  if(screen===5) return (
     <div style={wrap}>
       <style>{ONBOARDING_CSS}</style>
       {leaveModal}
       <div className="ob-fade" style={{textAlign:"center",padding:40,width:"100%",maxWidth:540}}>
-        {progress(3,4)}
+        {progress(4,5)}
         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,color:"#F5F0E8",letterSpacing:2,marginBottom:8}}>YOUR COACH BIO</div>
         <div style={{fontSize:14,color:"#9A9488",marginBottom:32}}>Based on your answers, we generated your bio. Edit it or use it as is.</div>
         <textarea className="ob-input" value={bio} onChange={e=>setBio(e.target.value)}
@@ -4549,6 +4658,8 @@ export default function BAMFull(){
   const [compose,setCompose]=useState("");
   const [focused,setFocused]=useState(false);
   const [attachments,setAttachments]=useState([]);
+  const [posting,setPosting]=useState(false);
+  const lastPostRef=useRef({text:"",time:0});
   const attachRef=useRef(null);
   const [ptsVis,setPtsVis]=useState(false);
   const [activeTag,setActiveTag]=useState("All");
@@ -4649,7 +4760,10 @@ export default function BAMFull(){
         <div style={{position:"fixed",top:notif&&notifOn?52:14,left:"50%",transform:"translateX(-50%)",zIndex:9998,background:"linear-gradient(135deg,#242424,#1A1A1A)",border:`1px solid ${GOLD}80`,borderRadius:10,padding:"10px 20px",fontSize:13,color:SBtext,display:"flex",alignItems:"center",gap:12,boxShadow:`0 8px 28px rgba(0,0,0,0.5),0 0 0 1px ${GOLD}20`,animation:"slideD .3s ease",whiteSpace:"nowrap"}}>
           <Video size={15} color={GOLD}/>
           <span style={{fontWeight:700,color:GOLD}}>{callBanner.title}</span>
-          <span style={{color:SBmid}}>in {fmtCountdown(callBanner.diff)}</span>
+          {callBanner.diff>0
+            ?<span style={{color:SBmid}}>in {fmtCountdown(callBanner.diff)}</span>
+            :<span style={{fontSize:11,fontWeight:800,color:"#fff",background:"#E06060",padding:"3px 10px",borderRadius:20,display:"inline-flex",alignItems:"center",gap:5,animation:"livePulse 1.5s ease-in-out infinite"}}><span style={{width:6,height:6,borderRadius:"50%",background:"#fff",display:"inline-block"}}/>LIVE NOW</span>
+          }
           <a href={callBanner.meetLink} target="_blank" rel="noopener noreferrer"
             style={{background:GOLD,color:"#111",padding:"5px 14px",borderRadius:6,fontSize:12,fontWeight:700,textDecoration:"none",fontFamily:"'DM Sans',sans-serif"}}>
             Join
@@ -4846,7 +4960,16 @@ export default function BAMFull(){
                           )}
                           <div style={{flex:1}}/>
                           <div className="btn" onClick={()=>{setFocused(false);setCompose("");setAttachments([]);}} style={{fontSize:14,color:C.textMid,padding:"8px 18px",borderRadius:8,border:`1px solid ${C.border}`}}>Cancel</div>
-                          <div className="btn" style={{fontSize:14,color:"#1A1A1A",background:GOLD,padding:"8px 20px",borderRadius:8,fontWeight:800,boxShadow:`0 4px 14px ${GOLD}55`,opacity:(compose.trim()||attachments.length)?1:0.5}}>Post</div>
+                          <div className="btn" onClick={()=>{
+                            if(posting||(!compose.trim()&&!attachments.length)) return;
+                            const now=Date.now();
+                            if(compose.trim()===lastPostRef.current.text&&now-lastPostRef.current.time<30000) return;
+                            setPosting(true);
+                            lastPostRef.current={text:compose.trim(),time:now};
+                            setTimeout(()=>{setPosting(false);setFocused(false);setCompose("");setAttachments([]);},400);
+                          }} style={{fontSize:14,color:"#1A1A1A",background:GOLD,padding:"8px 20px",borderRadius:8,fontWeight:800,boxShadow:`0 4px 14px ${GOLD}55`,opacity:(compose.trim()||attachments.length)&&!posting?1:0.5,pointerEvents:posting||(!compose.trim()&&!attachments.length)?"none":"auto"}}>
+                            {posting?"Posting...":"Post"}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -4913,7 +5036,12 @@ export default function BAMFull(){
                       <div onClick={()=>setCallsOpen(o=>!o)} style={{background:C.bgCard,border:`1px solid ${callsOpen?GOLD+"50":C.border}`,borderRadius:10,padding:"10px 16px",display:"flex",alignItems:"center",gap:10,cursor:"pointer",transition:"border-color .2s"}}>
                         <CalendarDays size={14} color={GOLD}/>
                         <span style={{fontSize:13,fontWeight:600,color:C.text,flex:1}}>Next Call: Monday 7PM EST</span>
-                        <span style={{fontSize:12,color:GOLD,fontWeight:700}}>{diff>0?fmtCountdown(diff):"Now"}</span>
+                        {diff>0
+                          ?<span style={{fontSize:12,color:GOLD,fontWeight:700}}>{fmtCountdown(diff)}</span>
+                          :<span style={{fontSize:11,fontWeight:800,color:"#fff",background:"#E06060",padding:"3px 10px",borderRadius:20,display:"inline-flex",alignItems:"center",gap:5,animation:"livePulse 1.5s ease-in-out infinite"}}>
+                            <span style={{width:6,height:6,borderRadius:"50%",background:"#fff",display:"inline-block"}}/>LIVE NOW
+                          </span>
+                        }
                         <ChevronDown size={14} color={C.textDim} style={{transform:callsOpen?"rotate(180deg)":"none",transition:"transform .2s"}}/>
                       </div>
                       {/* Expanded panel */}
@@ -4971,7 +5099,7 @@ export default function BAMFull(){
                     <span style={{fontSize:12,color:C.green,fontWeight:700}}>Live</span>
                   </div>
                 </div>
-                {(activeTag==="All"?POSTS_DATA:POSTS_DATA.filter(p=>p.tag===activeTag)).map((p,i)=><PostCard key={p.id} p={p} C={C} dark={dark} onTagClick={t=>setActiveTag(t)} activeTag={activeTag==="All"?null:activeTag} onProfileClick={setProfileName} showLikeHint={i===0}/>)}
+                {(activeTag==="All"?POSTS_DATA:POSTS_DATA.filter(p=>p.tag===activeTag)).map((p,i)=><PostCard key={p.id} p={p} C={C} dark={dark} onTagClick={t=>setActiveTag(t)} activeTag={activeTag==="All"?null:activeTag} onProfileClick={setProfileName} showLikeHint={i===0} onDelete={(id)=>{const idx=POSTS_DATA.findIndex(x=>x.id===id);if(idx>-1)POSTS_DATA.splice(idx,1);}}/>)}
               </div>
             </div>
           )}
