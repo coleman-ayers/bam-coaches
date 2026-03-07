@@ -3486,23 +3486,11 @@ const ONBOARDING_CSS = `
 .ob-tour-ring{animation:obTourPulse 1.5s ease-in-out infinite;}
 `;
 
-const OB_ROLES = ["Skills Trainer","Team Coach","Academy Coach","Parent/Player","College Coach","Pro Coach"];
-const OB_EXPERIENCE = ["Under 1 year","1–3 years","3–5 years","5–10 years","10+ years"];
+const OB_ROLES = ["Skills Trainer","Team Coach","Academy Coach","Parent/Player","College Coach","Pro Coach","Other"];
+const OB_EXPERIENCE = ["Under 1 year","1\u20133 years","3\u20135 years","5\u201310 years","10+ years"];
 const OB_AGE_GROUPS = ["Youth (under 12)","Middle School","High School","College","Pro","Mixed"];
-const COUNTRY_FLAGS={"United States":"🇺🇸","Canada":"🇨🇦","United Kingdom":"🇬🇧","Australia":"🇦🇺","Nigeria":"🇳🇬","Ghana":"🇬🇭","Spain":"🇪🇸","France":"🇫🇷","Germany":"🇩🇪","Japan":"🇯🇵","China":"🇨🇳","India":"🇮🇳","Brazil":"🇧🇷","Mexico":"🇲🇽","South Africa":"🇿🇦","Philippines":"🇵🇭","Italy":"🇮🇹","Netherlands":"🇳🇱","Sweden":"🇸🇪","Greece":"🇬🇷","Turkey":"🇹🇷","Egypt":"🇪🇬","Kenya":"🇰🇪","Argentina":"🇦🇷","Colombia":"🇨🇴","Dominican Republic":"🇩🇴","Puerto Rico":"🇵🇷","New Zealand":"🇳🇿","Belgium":"🇧🇪","Portugal":"🇵🇹","Ireland":"🇮🇪","Poland":"🇵🇱","Serbia":"🇷🇸","Croatia":"🇭🇷","Lithuania":"🇱🇹","Latvia":"🇱🇻","Slovenia":"🇸🇮","Israel":"🇮🇱","Lebanon":"🇱🇧","Saudi Arabia":"🇸🇦","UAE":"🇦🇪","Qatar":"🇶🇦","South Korea":"🇰🇷","Taiwan":"🇹🇼","Indonesia":"🇮🇩","Thailand":"🇹🇭","Singapore":"🇸🇬","Other":"🌍"};
-const OB_COUNTRIES = ["United States","Canada","United Kingdom","Australia","Nigeria","Ghana","Spain","France","Germany","Japan","China","India","Brazil","Mexico","South Africa","Philippines","Italy","Netherlands","Sweden","Greece","Turkey","Egypt","Kenya","Argentina","Colombia","Dominican Republic","Puerto Rico","New Zealand","Belgium","Portugal","Ireland","Poland","Serbia","Croatia","Lithuania","Latvia","Slovenia","Israel","Lebanon","Saudi Arabia","UAE","Qatar","South Korea","Taiwan","Indonesia","Thailand","Singapore","Other"];
-const OB_CITIES = {
-  "United States":["Miami","Los Angeles","New York","Chicago","Houston","Atlanta","Dallas","Phoenix","Philadelphia","San Antonio","San Diego","Denver","Seattle","Boston","Charlotte","Indianapolis","San Francisco","Portland","Las Vegas","Memphis","Other"],
-  "Canada":["Toronto","Vancouver","Montreal","Calgary","Ottawa","Edmonton","Winnipeg","Other"],
-  "United Kingdom":["London","Manchester","Birmingham","Liverpool","Leeds","Glasgow","Edinburgh","Other"],
-  "Australia":["Sydney","Melbourne","Brisbane","Perth","Adelaide","Other"],
-  "Nigeria":["Lagos","Abuja","Port Harcourt","Kano","Ibadan","Other"],
-  "Ghana":["Accra","Kumasi","Tamale","Other"],
-  "Spain":["Barcelona","Madrid","Valencia","Seville","Other"],
-  "France":["Paris","Lyon","Marseille","Toulouse","Other"],
-  "Germany":["Berlin","Munich","Hamburg","Frankfurt","Cologne","Other"],
-  "Japan":["Tokyo","Osaka","Kyoto","Yokohama","Nagoya","Other"],
-};
+const COUNTRY_FLAGS={"Afghanistan":"\ud83c\udde6\ud83c\uddeb","Albania":"\ud83c\udde6\ud83c\uddf1","Algeria":"\ud83c\udde9\ud83c\uddff","Andorra":"\ud83c\udde6\ud83c\udde9","Angola":"\ud83c\udde6\ud83c\uddf4","Antigua and Barbuda":"\ud83c\udde6\ud83c\uddec","Argentina":"\ud83c\udde6\ud83c\uddf7","Armenia":"\ud83c\udde6\ud83c\uddf2","Australia":"\ud83c\udde6\ud83c\uddfa","Austria":"\ud83c\udde6\ud83c\uddf9","Azerbaijan":"\ud83c\udde6\ud83c\uddff","Bahamas":"\ud83c\udde7\ud83c\uddf8","Bahrain":"\ud83c\udde7\ud83c\udded","Bangladesh":"\ud83c\udde7\ud83c\udde9","Barbados":"\ud83c\udde7\ud83c\udde7","Belarus":"\ud83c\udde7\ud83c\uddfe","Belgium":"\ud83c\udde7\ud83c\uddea","Belize":"\ud83c\udde7\ud83c\uddff","Benin":"\ud83c\udde7\ud83c\uddef","Bhutan":"\ud83c\udde7\ud83c\uddf9","Bolivia":"\ud83c\udde7\ud83c\uddf4","Bosnia and Herzegovina":"\ud83c\udde7\ud83c\udde6","Botswana":"\ud83c\udde7\ud83c\uddfc","Brazil":"\ud83c\udde7\ud83c\uddf7","Brunei":"\ud83c\udde7\ud83c\uddf3","Bulgaria":"\ud83c\udde7\ud83c\uddec","Burkina Faso":"\ud83c\udde7\ud83c\uddeb","Burundi":"\ud83c\udde7\ud83c\uddee","Cabo Verde":"\ud83c\udde8\ud83c\uddfb","Cambodia":"\ud83c\udde8\ud83c\uddf2","Cameroon":"\ud83c\udde8\ud83c\uddf2","Canada":"\ud83c\udde8\ud83c\udde6","Central African Republic":"\ud83c\udde8\ud83c\uddeb","Chad":"\ud83c\uddf9\ud83c\udde9","Chile":"\ud83c\udde8\ud83c\uddf1","China":"\ud83c\udde8\ud83c\uddf3","Colombia":"\ud83c\udde8\ud83c\uddf4","Comoros":"\ud83c\uddf0\ud83c\uddf2","Congo":"\ud83c\udde8\ud83c\uddec","Costa Rica":"\ud83c\udde8\ud83c\uddf7","Croatia":"\ud83c\udded\ud83c\uddf7","Cuba":"\ud83c\udde8\ud83c\uddfa","Cyprus":"\ud83c\udde8\ud83c\uddfe","Czech Republic":"\ud83c\udde8\ud83c\uddff","Denmark":"\ud83c\udde9\ud83c\uddf0","Djibouti":"\ud83c\udde9\ud83c\uddef","Dominica":"\ud83c\udde9\ud83c\uddf2","Dominican Republic":"\ud83c\udde9\ud83c\uddf4","DR Congo":"\ud83c\udde8\ud83c\udde9","Ecuador":"\ud83c\uddea\ud83c\udde8","Egypt":"\ud83c\uddea\ud83c\uddec","El Salvador":"\ud83c\uddf8\ud83c\uddfb","Equatorial Guinea":"\ud83c\uddec\ud83c\uddf6","Eritrea":"\ud83c\uddea\ud83c\uddf7","Estonia":"\ud83c\uddea\ud83c\uddea","Eswatini":"\ud83c\uddf8\ud83c\uddff","Ethiopia":"\ud83c\uddea\ud83c\uddf9","Fiji":"\ud83c\uddeb\ud83c\uddef","Finland":"\ud83c\uddeb\ud83c\uddee","France":"\ud83c\uddeb\ud83c\uddf7","Gabon":"\ud83c\uddec\ud83c\udde6","Gambia":"\ud83c\uddec\ud83c\uddf2","Georgia":"\ud83c\uddec\ud83c\uddea","Germany":"\ud83c\udde9\ud83c\uddea","Ghana":"\ud83c\uddec\ud83c\udded","Greece":"\ud83c\uddec\ud83c\uddf7","Grenada":"\ud83c\uddec\ud83c\udde9","Guatemala":"\ud83c\uddec\ud83c\uddf9","Guinea":"\ud83c\uddec\ud83c\uddf3","Guinea-Bissau":"\ud83c\uddec\ud83c\uddfc","Guyana":"\ud83c\uddec\ud83c\uddfe","Haiti":"\ud83c\udded\ud83c\uddf9","Honduras":"\ud83c\udded\ud83c\uddf3","Hungary":"\ud83c\udded\ud83c\uddfa","Iceland":"\ud83c\uddee\ud83c\uddf8","India":"\ud83c\uddee\ud83c\uddf3","Indonesia":"\ud83c\uddee\ud83c\udde9","Iran":"\ud83c\uddee\ud83c\uddf7","Iraq":"\ud83c\uddee\ud83c\uddf6","Ireland":"\ud83c\uddee\ud83c\uddea","Israel":"\ud83c\uddee\ud83c\uddf1","Italy":"\ud83c\uddee\ud83c\uddf9","Ivory Coast":"\ud83c\udde8\ud83c\uddee","Jamaica":"\ud83c\uddef\ud83c\uddf2","Japan":"\ud83c\uddef\ud83c\uddf5","Jordan":"\ud83c\uddef\ud83c\uddf4","Kazakhstan":"\ud83c\uddf0\ud83c\uddff","Kenya":"\ud83c\uddf0\ud83c\uddea","Kiribati":"\ud83c\uddf0\ud83c\uddee","Kosovo":"\ud83c\uddfd\ud83c\uddf0","Kuwait":"\ud83c\uddf0\ud83c\uddfc","Kyrgyzstan":"\ud83c\uddf0\ud83c\uddec","Laos":"\ud83c\uddf1\ud83c\udde6","Latvia":"\ud83c\uddf1\ud83c\uddfb","Lebanon":"\ud83c\uddf1\ud83c\udde7","Lesotho":"\ud83c\uddf1\ud83c\uddf8","Liberia":"\ud83c\uddf1\ud83c\uddf7","Libya":"\ud83c\uddf1\ud83c\uddfe","Liechtenstein":"\ud83c\uddf1\ud83c\uddee","Lithuania":"\ud83c\uddf1\ud83c\uddf9","Luxembourg":"\ud83c\uddf1\ud83c\uddfa","Madagascar":"\ud83c\uddf2\ud83c\uddec","Malawi":"\ud83c\uddf2\ud83c\uddfc","Malaysia":"\ud83c\uddf2\ud83c\uddfe","Maldives":"\ud83c\uddf2\ud83c\uddfb","Mali":"\ud83c\uddf2\ud83c\uddf1","Malta":"\ud83c\uddf2\ud83c\uddf9","Marshall Islands":"\ud83c\uddf2\ud83c\udded","Mauritania":"\ud83c\uddf2\ud83c\uddf7","Mauritius":"\ud83c\uddf2\ud83c\uddfa","Mexico":"\ud83c\uddf2\ud83c\uddfd","Micronesia":"\ud83c\uddeb\ud83c\uddf2","Moldova":"\ud83c\uddf2\ud83c\udde9","Monaco":"\ud83c\uddf2\ud83c\udde8","Mongolia":"\ud83c\uddf2\ud83c\uddf3","Montenegro":"\ud83c\uddf2\ud83c\uddea","Morocco":"\ud83c\uddf2\ud83c\udde6","Mozambique":"\ud83c\uddf2\ud83c\uddff","Myanmar":"\ud83c\uddf2\ud83c\uddf2","Namibia":"\ud83c\uddf3\ud83c\udde6","Nauru":"\ud83c\uddf3\ud83c\uddf7","Nepal":"\ud83c\uddf3\ud83c\uddf5","Netherlands":"\ud83c\uddf3\ud83c\uddf1","New Zealand":"\ud83c\uddf3\ud83c\uddff","Nicaragua":"\ud83c\uddf3\ud83c\uddee","Niger":"\ud83c\uddf3\ud83c\uddea","Nigeria":"\ud83c\uddf3\ud83c\uddec","North Korea":"\ud83c\uddf0\ud83c\uddf5","North Macedonia":"\ud83c\uddf2\ud83c\uddf0","Norway":"\ud83c\uddf3\ud83c\uddf4","Oman":"\ud83c\uddf4\ud83c\uddf2","Pakistan":"\ud83c\uddf5\ud83c\uddf0","Palau":"\ud83c\uddf5\ud83c\uddfc","Palestine":"\ud83c\uddf5\ud83c\uddf8","Panama":"\ud83c\uddf5\ud83c\udde6","Papua New Guinea":"\ud83c\uddf5\ud83c\uddec","Paraguay":"\ud83c\uddf5\ud83c\uddfe","Peru":"\ud83c\uddf5\ud83c\uddea","Philippines":"\ud83c\uddf5\ud83c\udded","Poland":"\ud83c\uddf5\ud83c\uddf1","Portugal":"\ud83c\uddf5\ud83c\uddf9","Puerto Rico":"\ud83c\uddf5\ud83c\uddf7","Qatar":"\ud83c\uddf6\ud83c\udde6","Romania":"\ud83c\uddf7\ud83c\uddf4","Russia":"\ud83c\uddf7\ud83c\uddfa","Rwanda":"\ud83c\uddf7\ud83c\uddfc","Saint Kitts and Nevis":"\ud83c\uddf0\ud83c\uddf3","Saint Lucia":"\ud83c\uddf1\ud83c\udde8","Saint Vincent and the Grenadines":"\ud83c\uddfb\ud83c\udde8","Samoa":"\ud83c\uddfc\ud83c\uddf8","San Marino":"\ud83c\uddf8\ud83c\uddf2","Sao Tome and Principe":"\ud83c\uddf8\ud83c\uddf9","Saudi Arabia":"\ud83c\uddf8\ud83c\udde6","Senegal":"\ud83c\uddf8\ud83c\uddf3","Serbia":"\ud83c\uddf7\ud83c\uddf8","Seychelles":"\ud83c\uddf8\ud83c\udde8","Sierra Leone":"\ud83c\uddf8\ud83c\uddf1","Singapore":"\ud83c\uddf8\ud83c\uddec","Slovakia":"\ud83c\uddf8\ud83c\uddf0","Slovenia":"\ud83c\uddf8\ud83c\uddee","Solomon Islands":"\ud83c\uddf8\ud83c\udde7","Somalia":"\ud83c\uddf8\ud83c\uddf4","South Africa":"\ud83c\uddff\ud83c\udde6","South Korea":"\ud83c\uddf0\ud83c\uddf7","South Sudan":"\ud83c\uddf8\ud83c\uddf8","Spain":"\ud83c\uddea\ud83c\uddf8","Sri Lanka":"\ud83c\uddf1\ud83c\uddf0","Sudan":"\ud83c\uddf8\ud83c\udde9","Suriname":"\ud83c\uddf8\ud83c\uddf7","Sweden":"\ud83c\uddf8\ud83c\uddea","Switzerland":"\ud83c\udde8\ud83c\udded","Syria":"\ud83c\uddf8\ud83c\uddfe","Taiwan":"\ud83c\uddf9\ud83c\uddfc","Tajikistan":"\ud83c\uddf9\ud83c\uddef","Tanzania":"\ud83c\uddf9\ud83c\uddff","Thailand":"\ud83c\uddf9\ud83c\udded","Timor-Leste":"\ud83c\uddf9\ud83c\uddf1","Togo":"\ud83c\uddf9\ud83c\uddec","Tonga":"\ud83c\uddf9\ud83c\uddf4","Trinidad and Tobago":"\ud83c\uddf9\ud83c\uddf9","Tunisia":"\ud83c\uddf9\ud83c\uddf3","Turkey":"\ud83c\uddf9\ud83c\uddf7","Turkmenistan":"\ud83c\uddf9\ud83c\uddf2","Tuvalu":"\ud83c\uddf9\ud83c\uddfb","UAE":"\ud83c\udde6\ud83c\uddea","Uganda":"\ud83c\uddfa\ud83c\uddec","Ukraine":"\ud83c\uddfa\ud83c\udde6","United Kingdom":"\ud83c\uddec\ud83c\udde7","United States":"\ud83c\uddfa\ud83c\uddf8","Uruguay":"\ud83c\uddfa\ud83c\uddfe","Uzbekistan":"\ud83c\uddfa\ud83c\uddff","Vanuatu":"\ud83c\uddfb\ud83c\uddfa","Vatican City":"\ud83c\uddfb\ud83c\udde6","Venezuela":"\ud83c\uddfb\ud83c\uddea","Vietnam":"\ud83c\uddfb\ud83c\uddf3","Yemen":"\ud83c\uddfe\ud83c\uddea","Zambia":"\ud83c\uddff\ud83c\uddf2","Zimbabwe":"\ud83c\uddff\ud83c\uddfc"};
+const OB_COUNTRIES = Object.keys(COUNTRY_FLAGS).sort();
 const OB_TOUR_STEPS = [
   {ids:["dashboard"],label:"Dashboard",desc:"This is your home base. Everything starts here.",type:"single"},
   {ids:["community"],label:"Community",desc:"Come back here and introduce yourself to the family. We want to know who you are.",type:"single"},
@@ -3558,33 +3546,69 @@ function OnboardingFlow({onComplete,onTourStart}){
   const [screen,setScreen]=useState(0);
   const [firstName,setFirstName]=useState("");
   const [lastName,setLastName]=useState("");
+  const [firstNameErr,setFirstNameErr]=useState("");
+  const [lastNameErr,setLastNameErr]=useState("");
   const [country,setCountry]=useState("");
   const [city,setCity]=useState("");
-  const [customCity,setCustomCity]=useState("");
   const [roles,setRoles]=useState([]);
+  const [customRole,setCustomRole]=useState("");
   const [experience,setExperience]=useState("");
   const [ageGroups,setAgeGroups]=useState([]);
   const [separates,setSeparates]=useState("");
   const [goal1yr,setGoal1yr]=useState("");
   const [goal10yr,setGoal10yr]=useState("");
   const [bio,setBio]=useState("");
+  const [showLeaveModal,setShowLeaveModal]=useState(false);
 
-  const cityOptions=OB_CITIES[country]||["Other"];
+  // Prompt 1: Back button interception
+  useEffect(()=>{
+    if(screen===0) return;
+    const pushGuard=()=>window.history.pushState(null,"",window.location.href);
+    pushGuard();
+    const onPop=()=>{setShowLeaveModal(true);pushGuard();};
+    window.addEventListener("popstate",onPop);
+    const onBeforeUnload=(e)=>{e.preventDefault();e.returnValue="";};
+    window.addEventListener("beforeunload",onBeforeUnload);
+    return()=>{window.removeEventListener("popstate",onPop);window.removeEventListener("beforeunload",onBeforeUnload);};
+  },[screen]);
+
+  const confirmLeave=()=>{setShowLeaveModal(false);setScreen(0);};
 
   const togglePill=(val,arr,setter)=>{
     setter(arr.includes(val)?arr.filter(v=>v!==val):[...arr,val]);
   };
 
-  const effectiveCity=customCity.trim()||city;
+  // Prompt 4: Name validation
+  const NAME_RE=/^[A-Za-z\u00C0-\u024F\u1E00-\u1EFF\s'\-]*$/;
+  const validateName=(val,setErr)=>{
+    if(val&&!NAME_RE.test(val)){setErr("Please enter a valid name");return false;}
+    setErr("");return true;
+  };
+  const handleNameChange=(val,setter,setErr)=>{
+    if(val.length>50) return;
+    setter(val);
+    if(val&&!NAME_RE.test(val)) setErr("Please enter a valid name");
+    else setErr("");
+  };
+  const handleNameBlur=(val,setter,setErr)=>{
+    const trimmed=val.trim();
+    setter(trimmed);
+    validateName(trimmed,setErr);
+  };
+
+  // Prompt 5: effective role list (replace "Other" with custom text)
+  const effectiveRoles=roles.map(r=>r==="Other"?customRole.trim()||"Other":r);
+
   const generateBio=useCallback(()=>{
-    const location=effectiveCity&&country?`${effectiveCity}, ${country}`:country||effectiveCity;
-    const roleStr=roles.length===1?roles[0]:roles.slice(0,-1).join(", ")+" and "+roles[roles.length-1];
-    const expMap={"Under 1 year":"just getting started","1–3 years":"a few years in","3–5 years":"several years of experience","5–10 years":"over half a decade of experience","10+ years":"over a decade of experience"};
+    const location=city.trim()&&country?`${city.trim()}, ${country}`:country||city.trim();
+    const rList=effectiveRoles.filter(Boolean);
+    const roleStr=rList.length===1?rList[0]:rList.slice(0,-1).join(", ")+" and "+rList[rList.length-1];
+    const expMap={"Under 1 year":"just getting started","1\u20133 years":"a few years in","3\u20135 years":"several years of experience","5\u201310 years":"over half a decade of experience","10+ years":"over a decade of experience"};
     const expPhrase=expMap[experience]||"experience";
     const ageStr=ageGroups.length===1?ageGroups[0].toLowerCase():ageGroups.slice(0,-1).map(a=>a.toLowerCase()).join(", ")+" and "+ageGroups[ageGroups.length-1].toLowerCase();
-    const bio=`I'm ${firstName}, a ${roleStr.toLowerCase()} based in ${location} with ${expPhrase} working with ${ageStr} athletes. ${separates.trim().replace(/\.$/,"")}. In the next year, my goal is to ${goal1yr.trim().toLowerCase().replace(/\.$/,"")}, and long-term I'm focused on ${goal10yr.trim().toLowerCase().replace(/\.$/,"")}.`;
-    setBio(bio);
-  },[firstName,country,effectiveCity,roles,experience,ageGroups,separates,goal1yr,goal10yr]);
+    const b=`I'm ${firstName}, a ${roleStr.toLowerCase()} based in ${location} with ${expPhrase} working with ${ageStr} athletes. ${separates.trim().replace(/\.$/,"")}. In the next year, my goal is to ${goal1yr.trim().toLowerCase().replace(/\.$/,"")}, and long-term I'm focused on ${goal10yr.trim().toLowerCase().replace(/\.$/,"")}.`;
+    setBio(b);
+  },[firstName,country,city,effectiveRoles,experience,ageGroups,separates,goal1yr,goal10yr]);
 
   useEffect(()=>{
     if(screen===4) generateBio();
@@ -3642,6 +3666,38 @@ function OnboardingFlow({onComplete,onTourStart}){
     flexDirection:"column",alignItems:"center",justifyContent:"center",
     fontFamily:"'DM Sans',sans-serif",overflow:"auto"};
 
+  // Prompt 1: Leave confirmation modal
+  const leaveModal=showLeaveModal&&(
+    <div style={{position:"fixed",inset:0,zIndex:10001,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{background:"#1A1A1A",borderRadius:16,padding:"36px 40px",maxWidth:400,textAlign:"center",border:"1px solid #333"}}>
+        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:26,color:"#F5F0E8",letterSpacing:1.5,marginBottom:12}}>ARE YOU SURE?</div>
+        <div style={{fontSize:14,color:"#9A9488",lineHeight:1.7,marginBottom:28}}>Your progress will not be saved.</div>
+        <div style={{display:"flex",gap:12,justifyContent:"center"}}>
+          <button onClick={()=>setShowLeaveModal(false)}
+            style={{padding:"12px 32px",borderRadius:10,fontSize:14,fontWeight:800,letterSpacing:1,
+              background:GOLD,color:"#111",border:"none",fontFamily:"'Bebas Neue',sans-serif",cursor:"pointer"}}>STAY</button>
+          <button onClick={confirmLeave}
+            style={{padding:"12px 32px",borderRadius:10,fontSize:14,fontWeight:800,letterSpacing:1,
+              background:"transparent",color:"#9A9488",border:"1px solid #333",fontFamily:"'Bebas Neue',sans-serif",cursor:"pointer"}}>LEAVE</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Prompt 7: character count helper for identity fields
+  const charCount=(val,min,max)=>(
+    <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginTop:4}}>
+      <span style={{color:val.length<min?"#E06060":"#4A4840"}}>{val.length<min?`${min-val.length} more characters needed`:""}</span>
+      <span style={{color:max-val.length<=10?"#E06060":"#4A4840"}}>{val.length}/{max}</span>
+    </div>
+  );
+  // Prompt 7: handle paste truncation
+  const handleIdentityChange=(e,setter,max)=>{
+    let v=e.target.value;
+    if(v.length>max) v=v.slice(0,max);
+    setter(v);
+  };
+
   // Screen 0: Welcome
   if(screen===0) return (
     <div style={wrap}>
@@ -3662,41 +3718,72 @@ function OnboardingFlow({onComplete,onTourStart}){
   );
 
   // Screen 1: Profile basics
+  const nameValid=firstName.trim()&&!firstNameErr&&lastName.trim()&&!lastNameErr;
+  const rolesValid=roles.length>0&&(roles.includes("Other")?customRole.trim().length>0:true);
   if(screen===1) return (
     <div style={wrap}>
       <style>{ONBOARDING_CSS}</style>
+      {leaveModal}
       <div className="ob-fade" style={{textAlign:"center",padding:40,width:"100%",maxWidth:540}}>
         {progress(0,4)}
         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:38,color:"#F5F0E8",letterSpacing:2,marginBottom:8}}>LET'S LEARN A BIT ABOUT YOU</div>
         <div style={{fontSize:13,color:"#4A4840",marginBottom:32}}>Step 1 of 4</div>
         <div style={{width:"100%",maxWidth:420,margin:"0 auto",textAlign:"left"}}>
-          <div style={{display:"flex",gap:10,marginBottom:14}}>
-            <input className="ob-input" placeholder="First name" value={firstName} onChange={e=>setFirstName(e.target.value)}
-              style={{...inputStyle,maxWidth:"100%",flex:1,marginBottom:0}}/>
-            <input className="ob-input" placeholder="Last name" value={lastName} onChange={e=>setLastName(e.target.value)}
-              style={{...inputStyle,maxWidth:"100%",flex:1,marginBottom:0}}/>
+          {/* Prompt 4: Name fields with validation */}
+          <div style={{display:"flex",gap:10,marginBottom:4}}>
+            <div style={{flex:1}}>
+              <input className="ob-input" placeholder="First name" value={firstName}
+                onChange={e=>handleNameChange(e.target.value,setFirstName,setFirstNameErr)}
+                onBlur={()=>handleNameBlur(firstName,setFirstName,setFirstNameErr)}
+                style={{...inputStyle,maxWidth:"100%",marginBottom:0,borderColor:firstNameErr?"#E06060":"#333"}}/>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:10,marginTop:2,minHeight:16}}>
+                <span style={{color:"#E06060"}}>{firstNameErr}</span>
+                {firstName.length>40&&<span style={{color:"#4A4840"}}>{firstName.length}/50</span>}
+              </div>
+            </div>
+            <div style={{flex:1}}>
+              <input className="ob-input" placeholder="Last name" value={lastName}
+                onChange={e=>handleNameChange(e.target.value,setLastName,setLastNameErr)}
+                onBlur={()=>handleNameBlur(lastName,setLastName,setLastNameErr)}
+                style={{...inputStyle,maxWidth:"100%",marginBottom:0,borderColor:lastNameErr?"#E06060":"#333"}}/>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:10,marginTop:2,minHeight:16}}>
+                <span style={{color:"#E06060"}}>{lastNameErr}</span>
+                {lastName.length>40&&<span style={{color:"#4A4840"}}>{lastName.length}/50</span>}
+              </div>
+            </div>
           </div>
-          <SearchableDropdown options={OB_COUNTRIES} value={country} onChange={v=>{setCountry(v);setCity("");setCustomCity("");}} placeholder="Country" style={dropdownStyle}
+          {/* Prompt 2: Full country dropdown */}
+          <SearchableDropdown options={OB_COUNTRIES} value={country} onChange={v=>{setCountry(v);setCity("");}} placeholder="Country" style={dropdownStyle}
             renderLabel={o=>COUNTRY_FLAGS[o]?`${COUNTRY_FLAGS[o]}  ${o}`:o}/>
-          <SearchableDropdown options={cityOptions} value={city} onChange={v=>{setCity(v);if(v)setCustomCity("");}} placeholder="City" style={dropdownStyle}/>
-          {(!city||city==="Other")&&(
-            <input className="ob-input" placeholder="Not seeing your city? Type it here" value={customCity} onChange={e=>setCustomCity(e.target.value)}
-              style={{...inputStyle,maxWidth:"100%",marginTop:city==="Other"?0:0}}/>
-          )}
+          {/* Prompt 3: City free text input */}
+          <input className="ob-input" placeholder="Enter your city" value={city} onChange={e=>setCity(e.target.value)}
+            style={{...inputStyle,maxWidth:"100%"}}/>
         </div>
+        {/* Prompt 5: Roles with "Other" option */}
         <div style={{fontSize:13,color:"#9A9488",marginBottom:12,marginTop:8,textAlign:"left"}}>Coaching role (select all that apply)</div>
         <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginBottom:8}}>
           {OB_ROLES.map(r=>pillBtn(r,roles.includes(r),()=>togglePill(r,roles,setRoles)))}
         </div>
-        {ctaBtn("NEXT",()=>setScreen(2),!firstName.trim()||!lastName.trim()||!country||(!city&&!customCity.trim())||roles.length===0)}
+        {roles.includes("Other")&&(
+          <input className="ob-input" placeholder="Tell us your role" value={customRole} onChange={e=>setCustomRole(e.target.value)}
+            style={{...inputStyle,maxWidth:300,margin:"8px auto 0",textAlign:"center"}}/>
+        )}
+        {ctaBtn("NEXT",()=>setScreen(2),!nameValid||!country||city.trim().length<2||!rolesValid)}
       </div>
     </div>
   );
 
   // Screen 2: Coaching background
+  // Prompt 6: Select All toggle
+  const allAgesSelected=OB_AGE_GROUPS.every(a=>ageGroups.includes(a));
+  const toggleAllAges=()=>{
+    if(allAgesSelected) setAgeGroups([]);
+    else setAgeGroups([...OB_AGE_GROUPS]);
+  };
   if(screen===2) return (
     <div style={wrap}>
       <style>{ONBOARDING_CSS}</style>
+      {leaveModal}
       <div className="ob-fade" style={{textAlign:"center",padding:40,width:"100%",maxWidth:540}}>
         {progress(1,4)}
         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,color:"#F5F0E8",letterSpacing:2,marginBottom:8}}>YOUR COACHING STORY</div>
@@ -3705,7 +3792,15 @@ function OnboardingFlow({onComplete,onTourStart}){
         <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginBottom:24}}>
           {OB_EXPERIENCE.map(e=>singlePill(e,experience===e,()=>setExperience(e)))}
         </div>
-        <div style={{fontSize:13,color:"#9A9488",marginBottom:12,textAlign:"left"}}>What age groups do you work with? (select all that apply)</div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,textAlign:"left"}}>
+          <div style={{fontSize:13,color:"#9A9488"}}>What age groups do you work with? (select all that apply)</div>
+          <div className="ob-pill" onClick={toggleAllAges}
+            style={{padding:"5px 14px",borderRadius:16,fontSize:11,fontWeight:700,cursor:"pointer",
+              background:allAgesSelected?GOLD:"transparent",color:allAgesSelected?"#111":"#9A9488",
+              border:`1px solid ${allAgesSelected?GOLD:"#333"}`,whiteSpace:"nowrap"}}>
+            {allAgesSelected?"Deselect All":"Select All"}
+          </div>
+        </div>
         <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginBottom:8}}>
           {OB_AGE_GROUPS.map(a=>pillBtn(a,ageGroups.includes(a),()=>togglePill(a,ageGroups,setAgeGroups)))}
         </div>
@@ -3714,10 +3809,12 @@ function OnboardingFlow({onComplete,onTourStart}){
     </div>
   );
 
-  // Screen 3: Coaching identity
+  // Screen 3: Coaching identity (Prompt 7: 20-500 char validation)
+  const id3Valid=separates.trim().length>=20&&goal1yr.trim().length>=20&&goal10yr.trim().length>=20;
   if(screen===3) return (
     <div style={wrap}>
       <style>{ONBOARDING_CSS}</style>
+      {leaveModal}
       <div className="ob-fade" style={{textAlign:"center",padding:40,width:"100%",maxWidth:540}}>
         {progress(2,4)}
         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,color:"#F5F0E8",letterSpacing:2,marginBottom:8}}>WHAT DRIVES YOU</div>
@@ -3725,49 +3822,76 @@ function OnboardingFlow({onComplete,onTourStart}){
         <div style={{textAlign:"left",marginBottom:14}}>
           <div style={{fontSize:13,color:"#9A9488",marginBottom:8}}>What separates you as a coach?</div>
           <textarea className="ob-input" placeholder="Be honest. What do you do differently?" value={separates}
-            onChange={e=>setSeparates(e.target.value)} maxLength={300}
+            onChange={e=>handleIdentityChange(e,setSeparates,500)}
             style={{...inputStyle,height:80,resize:"none",marginBottom:0}}/>
+          {charCount(separates,20,500)}
         </div>
         <div style={{textAlign:"left",marginBottom:14}}>
           <div style={{fontSize:13,color:"#9A9488",marginBottom:8}}>What's your goal as a coach in the next year?</div>
           <textarea className="ob-input" placeholder="Be specific." value={goal1yr}
-            onChange={e=>setGoal1yr(e.target.value)} maxLength={200}
+            onChange={e=>handleIdentityChange(e,setGoal1yr,500)}
             style={{...inputStyle,height:64,resize:"none",marginBottom:0}}/>
+          {charCount(goal1yr,20,500)}
         </div>
         <div style={{textAlign:"left",marginBottom:0}}>
           <div style={{fontSize:13,color:"#9A9488",marginBottom:8}}>What's your goal as a coach in the next 10 years?</div>
           <textarea className="ob-input" placeholder="Think big." value={goal10yr}
-            onChange={e=>setGoal10yr(e.target.value)} maxLength={200}
+            onChange={e=>handleIdentityChange(e,setGoal10yr,500)}
             style={{...inputStyle,height:64,resize:"none",marginBottom:0}}/>
+          {charCount(goal10yr,20,500)}
         </div>
-        {ctaBtn("NEXT",()=>setScreen(4),!separates.trim()||!goal1yr.trim()||!goal10yr.trim())}
+        {ctaBtn("NEXT",()=>setScreen(4),!id3Valid)}
       </div>
     </div>
   );
 
-  // Screen 4: Bio generation
+  // Screen 4: Bio generation (Prompt 8: editable, regenerate, 600 char limit)
+  const bioOverLimit=bio.length>600;
   if(screen===4) return (
     <div style={wrap}>
       <style>{ONBOARDING_CSS}</style>
+      {leaveModal}
       <div className="ob-fade" style={{textAlign:"center",padding:40,width:"100%",maxWidth:540}}>
         {progress(3,4)}
         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,color:"#F5F0E8",letterSpacing:2,marginBottom:8}}>YOUR COACH BIO</div>
         <div style={{fontSize:14,color:"#9A9488",marginBottom:32}}>Based on your answers, we generated your bio. Edit it or use it as is.</div>
         <textarea className="ob-input" value={bio} onChange={e=>setBio(e.target.value)}
-          style={{...inputStyle,maxWidth:"100%",height:140,resize:"vertical",lineHeight:1.7,fontSize:14}}/>
-        {ctaBtn("LOOKS GOOD",()=>{if(onTourStart)onTourStart();},!bio.trim())}
+          style={{...inputStyle,maxWidth:"100%",height:140,resize:"vertical",lineHeight:1.7,fontSize:14,
+            borderColor:bioOverLimit?"#E06060":"#333"}}/>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4,marginBottom:4}}>
+          <span style={{fontSize:11,color:"#4A4840",fontStyle:"italic"}}>This is your starting point \u2014 make it yours.</span>
+          <span style={{fontSize:11,color:bioOverLimit?"#E06060":"#4A4840"}}>{bio.length}/600</span>
+        </div>
+        <div style={{display:"flex",gap:12,justifyContent:"center",marginTop:16}}>
+          <button className="ob-btn" onClick={generateBio}
+            style={{padding:"14px 36px",borderRadius:10,fontSize:14,fontWeight:800,letterSpacing:1,
+              background:"transparent",color:GOLD,border:`1px solid ${GOLD}`,
+              fontFamily:"'Bebas Neue',sans-serif",cursor:"pointer"}}>REGENERATE</button>
+          {ctaBtn("LOOKS GOOD",()=>{if(onTourStart)onTourStart();},!bio.trim()||bioOverLimit)}
+        </div>
       </div>
     </div>
   );
 
-  // Screen 5 is now handled by TourOverlay in the parent
   return null;
 }
 
 function TourOverlay({onComplete,onNavigate}){
   const [tourStep,setTourStep]=useState(0);
+  const [showLeaveModal,setShowLeaveModal]=useState(false);
   const tourData=OB_TOUR_STEPS[tourStep];
   const isLast=tourStep===OB_TOUR_STEPS.length-1;
+
+  // Prompt 9: Back button interception during tour
+  useEffect(()=>{
+    const pushGuard=()=>window.history.pushState(null,"",window.location.href);
+    pushGuard();
+    const onPop=()=>{setShowLeaveModal(true);pushGuard();};
+    window.addEventListener("popstate",onPop);
+    const onBeforeUnload=(e)=>{e.preventDefault();e.returnValue="";};
+    window.addEventListener("beforeunload",onBeforeUnload);
+    return()=>{window.removeEventListener("popstate",onPop);window.removeEventListener("beforeunload",onBeforeUnload);};
+  },[]);
   const TOUR_SIDEBAR=[
     {id:"dashboard",label:"Dashboard",Icon:LayoutDashboard,indent:0},
     {id:"community",label:"Community",Icon:Users,indent:0},
@@ -3807,6 +3931,23 @@ function TourOverlay({onComplete,onNavigate}){
   return (
     <div style={{position:"fixed",inset:0,zIndex:10000,fontFamily:"'DM Sans',sans-serif",pointerEvents:"none"}}>
       <style>{ONBOARDING_CSS}</style>
+      {/* Prompt 9: Leave modal during tour */}
+      {showLeaveModal&&(
+        <div style={{position:"fixed",inset:0,zIndex:10002,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"auto"}}>
+          <div style={{background:"#1A1A1A",borderRadius:16,padding:"36px 40px",maxWidth:400,textAlign:"center",border:"1px solid #333"}}>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:26,color:"#F5F0E8",letterSpacing:1.5,marginBottom:12}}>ARE YOU SURE?</div>
+            <div style={{fontSize:14,color:"#9A9488",lineHeight:1.7,marginBottom:28}}>Your progress will not be saved.</div>
+            <div style={{display:"flex",gap:12,justifyContent:"center"}}>
+              <button onClick={()=>setShowLeaveModal(false)}
+                style={{padding:"12px 32px",borderRadius:10,fontSize:14,fontWeight:800,letterSpacing:1,
+                  background:GOLD,color:"#111",border:"none",fontFamily:"'Bebas Neue',sans-serif",cursor:"pointer"}}>STAY</button>
+              <button onClick={()=>{setShowLeaveModal(false);finish();}}
+                style={{padding:"12px 32px",borderRadius:10,fontSize:14,fontWeight:800,letterSpacing:1,
+                  background:"transparent",color:"#9A9488",border:"1px solid #333",fontFamily:"'Bebas Neue',sans-serif",cursor:"pointer"}}>LEAVE</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Semi-transparent overlay */}
       <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.6)",pointerEvents:"auto"}}/>
       {/* Sidebar highlight layer */}
