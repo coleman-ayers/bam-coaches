@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { LayoutDashboard, Users, Target, Megaphone, Brain, Lightbulb, Clipboard, FileText, Zap, GraduationCap, Play, Clock, ChevronLeft, Share2, Lock, CheckCircle, Filter, X, BookOpen, Pen, Trash2, Download, Globe2, ExternalLink, Headphones, BookMarked, Sparkles, ChevronDown, Library, Video, CalendarDays, GripVertical, Plus, ChevronUp, ChevronRight, Save, Type } from "lucide-react";
+import { supabase } from "./supabaseClient";
 
 const LOGO = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='40'%3E%3Ctext x='17' y='28' font-family='sans-serif' font-size='13' font-weight='900' fill='%23E2DD9F' text-anchor='middle'%3EBAM%3C/text%3E%3C/svg%3E";
 const GOLD = "#E2DD9F";
@@ -4227,7 +4228,58 @@ function SearchableDropdown({options,value,onChange,placeholder,style:{marginBot
 
 const BAM_LOGO_PNG="data:image/png;base64,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";
 
-function OnboardingFlow({onComplete,onTourStart}){
+// ── SIGN IN SCREEN ──────────────────────────────────────────────────────────
+function SignInScreen({onBack,onSuccess}){
+  const [email,setEmail]=useState("");
+  const [password,setPassword]=useState("");
+  const [error,setError]=useState("");
+  const [loading,setLoading]=useState(false);
+  const handleSignIn=async()=>{
+    if(!email.trim()||!password){setError("Please enter your email and password.");return;}
+    setLoading(true);setError("");
+    try{
+      const {data,error:err}=await supabase.auth.signInWithPassword({email:email.trim(),password});
+      if(err) throw err;
+      if(data.user){
+        try{localStorage.setItem("onboardingComplete","true");localStorage.setItem("bam_auth_token","sb");}catch{}
+        onSuccess(data.user);
+      }
+    }catch(e){
+      setError(e.message||"Sign in failed. Please check your credentials.");
+    }finally{setLoading(false);}
+  };
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:10000,background:"#080808",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontFamily:"'DM Sans',sans-serif"}}>
+      <div style={{textAlign:"center",padding:40,width:"100%",maxWidth:420}}>
+        <img src={BAM_LOGO_PNG} alt="BAM" style={{width:56,height:70,objectFit:"contain",marginBottom:20,filter:"drop-shadow(0 0 20px rgba(226,221,159,0.3))"}}/>
+        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:38,color:"#F5F0E8",letterSpacing:2,marginBottom:8}}>WELCOME BACK</div>
+        <div style={{fontSize:14,color:"#9A9488",marginBottom:32}}>Sign in to your coaching platform</div>
+        <div style={{textAlign:"left"}}>
+          <div style={{fontSize:13,color:"#9A9488",marginBottom:6}}>Email</div>
+          <input type="email" placeholder="your@email.com" value={email} onChange={e=>setEmail(e.target.value)}
+            onKeyDown={e=>{if(e.key==="Enter")handleSignIn();}}
+            style={{width:"100%",padding:"14px 18px",borderRadius:10,fontSize:14,fontFamily:"'DM Sans',sans-serif",background:"#1A1A1A",color:"#F5F0E8",border:"1px solid #333",marginBottom:14,boxSizing:"border-box"}}/>
+          <div style={{fontSize:13,color:"#9A9488",marginBottom:6}}>Password</div>
+          <input type="password" placeholder="Your password" value={password} onChange={e=>setPassword(e.target.value)}
+            onKeyDown={e=>{if(e.key==="Enter")handleSignIn();}}
+            style={{width:"100%",padding:"14px 18px",borderRadius:10,fontSize:14,fontFamily:"'DM Sans',sans-serif",background:"#1A1A1A",color:"#F5F0E8",border:"1px solid #333",marginBottom:14,boxSizing:"border-box"}}/>
+          {error&&<div style={{fontSize:13,color:"#E06060",marginBottom:14,padding:"10px 14px",borderRadius:8,background:"rgba(224,96,96,0.1)",border:"1px solid rgba(224,96,96,0.3)"}}>{error}</div>}
+        </div>
+        <button onClick={handleSignIn} disabled={loading}
+          style={{width:"100%",padding:"16px",borderRadius:10,fontSize:15,fontWeight:800,letterSpacing:1.5,
+            background:loading?"#333":GOLD,color:loading?"#666":"#111",border:"none",
+            fontFamily:"'Bebas Neue',sans-serif",cursor:loading?"not-allowed":"pointer",marginTop:8}}>
+          {loading?"SIGNING IN...":"SIGN IN"}
+        </button>
+        <div onClick={onBack} className="btn" style={{marginTop:20,fontSize:13,color:"#9A9488",cursor:"pointer"}}>
+          Don't have an account? <span style={{color:GOLD,fontWeight:700}}>Sign up</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OnboardingFlow({onComplete,onTourStart,onSignIn}){
   const [screen,setScreen]=useState(0);
   const [firstName,setFirstName]=useState("");
   const [lastName,setLastName]=useState("");
@@ -4246,6 +4298,13 @@ function OnboardingFlow({onComplete,onTourStart}){
   const [profilePhoto,setProfilePhoto]=useState(null);
   const [showLeaveModal,setShowLeaveModal]=useState(false);
   const photoInputRef=useRef(null);
+  // Auth fields
+  const [email,setEmail]=useState("");
+  const [password,setPassword]=useState("");
+  const [emailErr,setEmailErr]=useState("");
+  const [passwordErr,setPasswordErr]=useState("");
+  const [signupLoading,setSignupLoading]=useState(false);
+  const [signupError,setSignupError]=useState("");
 
   // Prompt 1: Back button interception
   useEffect(()=>{
@@ -4301,10 +4360,15 @@ function OnboardingFlow({onComplete,onTourStart}){
     if(screen===5) generateBio();
   },[screen,generateBio]);
 
+  const getProfileData=()=>({
+    firstName:firstName.trim(),lastName:lastName.trim(),country,city:city.trim(),
+    roles:effectiveRoles.filter(Boolean),experience,ageGroups,
+    separates:separates.trim(),goal1yr:goal1yr.trim(),goal10yr:goal10yr.trim(),
+    bio:bio.trim(),profilePhoto,email:email.trim(),password
+  });
   const finish=()=>{
-    try{localStorage.setItem("onboardingComplete","true");}catch(e){}
     try{if(firstName.trim()) localStorage.setItem("bam_user_name",firstName.trim());}catch(e){}
-    onComplete();
+    onComplete(getProfileData());
   };
 
   const progress=(step,total)=>(
@@ -4401,6 +4465,7 @@ function OnboardingFlow({onComplete,onTourStart}){
           <span style={{color:"#F5F0E8",fontWeight:600}}>MASTERCLASSES</span> · <span style={{color:"#F5F0E8",fontWeight:600}}>X&O BREAKDOWNS</span> · <span style={{color:"#F5F0E8",fontWeight:600}}>FULL WORKOUTS</span>
         </div>
         {ctaBtn("LET'S BUILD",()=>setScreen(1))}
+        {onSignIn&&<div onClick={onSignIn} className="btn" style={{marginTop:20,fontSize:13,color:"#9A9488",cursor:"pointer"}}>Already have an account? <span style={{color:GOLD,fontWeight:700}}>Sign in</span></div>}
       </div>
     </div>
   );
@@ -4584,7 +4649,7 @@ function OnboardingFlow({onComplete,onTourStart}){
       <style>{ONBOARDING_CSS}</style>
       {leaveModal}
       <div className="ob-fade" style={{textAlign:"center",padding:40,width:"100%",maxWidth:540}}>
-        {progress(4,5)}
+        {progress(4,6)}
         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,color:"#F5F0E8",letterSpacing:2,marginBottom:8}}>YOUR COACH BIO</div>
         <div style={{fontSize:14,color:"#9A9488",marginBottom:32}}>Based on your answers, we generated your bio. Edit it or use it as is.</div>
         <textarea className="ob-input" value={bio} onChange={e=>setBio(e.target.value)}
@@ -4599,8 +4664,61 @@ function OnboardingFlow({onComplete,onTourStart}){
             style={{padding:"14px 36px",borderRadius:10,fontSize:14,fontWeight:800,letterSpacing:1,
               background:"transparent",color:GOLD,border:`1px solid ${GOLD}`,
               fontFamily:"'Bebas Neue',sans-serif",cursor:"pointer"}}>REGENERATE</button>
-          {ctaBtn("LOOKS GOOD",()=>{if(onTourStart)onTourStart();},!bio.trim()||bioOverLimit)}
+          {ctaBtn("LOOKS GOOD",()=>setScreen(6),!bio.trim()||bioOverLimit)}
         </div>
+      </div>
+    </div>
+  );
+
+  // Screen 6: Create account (email + password)
+  const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const validateEmail=(v)=>{if(!v){setEmailErr("Email is required");return false;}if(!EMAIL_RE.test(v)){setEmailErr("Enter a valid email");return false;}setEmailErr("");return true;};
+  const validatePassword=(v)=>{if(!v){setPasswordErr("Password is required");return false;}if(v.length<6){setPasswordErr("Password must be at least 6 characters");return false;}setPasswordErr("");return true;};
+  const handleCreateAccount=async()=>{
+    const eOk=validateEmail(email.trim());
+    const pOk=validatePassword(password);
+    if(!eOk||!pOk) return;
+    setSignupLoading(true);setSignupError("");
+    try{
+      const pd=getProfileData();
+      if(onTourStart) await onTourStart(pd);
+      else await onComplete(pd);
+    }catch(e){
+      setSignupError(e.message||"Sign up failed. Please try again.");
+    }finally{
+      setSignupLoading(false);
+    }
+  };
+  if(screen===6) return (
+    <div style={wrap}>
+      <style>{ONBOARDING_CSS}</style>
+      {leaveModal}
+      <div className="ob-fade" style={{textAlign:"center",padding:40,width:"100%",maxWidth:540}}>
+        {progress(5,6)}
+        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,color:"#F5F0E8",letterSpacing:2,marginBottom:8}}>CREATE YOUR ACCOUNT</div>
+        <div style={{fontSize:14,color:"#9A9488",marginBottom:32}}>Last step — set up your login credentials.</div>
+        <div style={{width:"100%",maxWidth:420,margin:"0 auto",textAlign:"left"}}>
+          <div style={{fontSize:13,color:"#9A9488",marginBottom:6}}>Email</div>
+          <input className="ob-input" type="email" placeholder="your@email.com" value={email}
+            onChange={e=>{setEmail(e.target.value);if(emailErr)validateEmail(e.target.value);}}
+            onBlur={()=>validateEmail(email.trim())}
+            style={{...inputStyle,borderColor:emailErr?"#E06060":"#333"}}/>
+          {emailErr&&<div style={{fontSize:11,color:"#E06060",marginTop:-10,marginBottom:10}}>{emailErr}</div>}
+          <div style={{fontSize:13,color:"#9A9488",marginBottom:6}}>Password</div>
+          <input className="ob-input" type="password" placeholder="At least 6 characters" value={password}
+            onChange={e=>{setPassword(e.target.value);if(passwordErr)validatePassword(e.target.value);}}
+            onBlur={()=>validatePassword(password)}
+            style={{...inputStyle,borderColor:passwordErr?"#E06060":"#333"}}/>
+          {passwordErr&&<div style={{fontSize:11,color:"#E06060",marginTop:-10,marginBottom:10}}>{passwordErr}</div>}
+          {signupError&&<div style={{fontSize:13,color:"#E06060",marginTop:8,padding:"10px 14px",borderRadius:8,background:"rgba(224,96,96,0.1)",border:"1px solid rgba(224,96,96,0.3)"}}>{signupError}</div>}
+        </div>
+        <button className="ob-btn" onClick={handleCreateAccount} disabled={signupLoading}
+          style={{padding:"16px 48px",borderRadius:10,fontSize:15,fontWeight:800,letterSpacing:1.5,
+            background:signupLoading?"#333":GOLD,color:signupLoading?"#666":"#111",border:"none",
+            fontFamily:"'Bebas Neue',sans-serif",cursor:signupLoading?"not-allowed":"pointer",marginTop:20}}>
+          {signupLoading?"CREATING ACCOUNT...":"GET STARTED"}
+        </button>
+        {onSignIn&&<div onClick={onSignIn} className="btn" style={{marginTop:16,fontSize:13,color:"#9A9488",cursor:"pointer"}}>Already have an account? <span style={{color:GOLD,fontWeight:700}}>Sign in</span></div>}
       </div>
     </div>
   );
@@ -4650,7 +4768,6 @@ function TourOverlay({onComplete,onNavigate}){
   },[tourStep,tourData.ids,onNavigate]);
 
   const finish=()=>{
-    try{localStorage.setItem("onboardingComplete","true");}catch(e){}
     if(onNavigate) onNavigate("dashboard");
     onComplete();
   };
@@ -5563,7 +5680,7 @@ function fmtTimeInTz(date,tz){
 }
 
 // ── SETTINGS PAGE ──────────────────────────────────────────────────────────
-function SettingsPage({C,dark,toggleDark,notifs,updateNotif,tz,updateTz,mapVisible,toggleMapVisible,dismissBanner,dismissedBanners}){
+function SettingsPage({C,dark,toggleDark,notifs,updateNotif,tz,updateTz,mapVisible,toggleMapVisible,dismissBanner,dismissedBanners,onSignOut}){
   const [tzSearch, setTzSearch] = useState("");
   const [tzOpen, setTzOpen] = useState(false);
   const [savedKey, setSavedKey] = useState(null);
@@ -5695,6 +5812,18 @@ function SettingsPage({C,dark,toggleDark,notifs,updateNotif,tz,updateTz,mapVisib
             </div>
           </div>
         </div>
+
+        {/* Account */}
+        <div style={{marginBottom:28}}>
+          <div style={{fontSize:12,fontWeight:800,color:C.textDim,letterSpacing:1,textTransform:"uppercase",marginBottom:12}}>Account</div>
+          <div style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:13,padding:"18px",boxShadow:dark?"none":`0 2px 14px ${C.shadow}`}}>
+            <button onClick={onSignOut}
+              style={{width:"100%",padding:"12px 18px",borderRadius:8,border:`1px solid #E0606060`,background:"transparent",
+                color:"#E06060",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>
+              Sign Out
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -5724,9 +5853,43 @@ const BAM_LS_KEYS=["bam_dark_mode","bam_settings_notifs","bam_settings_tz","bam_
 (function bamViewportFix(){if(typeof window==="undefined")return;const set=()=>document.documentElement.style.setProperty("--app-height",window.innerHeight+"px");set();window.addEventListener("resize",set);})();
 
 export default function BAMFull(){
-  const [onboarded,setOnboarded]=useState(()=>{
-    try{ return localStorage.getItem("onboardingComplete")==="true"; }catch(e){ return false; }
-  });
+  // ── Supabase auth state ──
+  const [sbUser,setSbUser]=useState(null); // Supabase user object (has .id UUID)
+  const [authLoading,setAuthLoading]=useState(true);
+  const [onboarded,setOnboarded]=useState(false);
+  const [showSignIn,setShowSignIn]=useState(false);
+
+  // Check existing session on mount + listen for auth changes
+  useEffect(()=>{
+    let mounted=true;
+    supabase.auth.getSession().then(({data:{session}})=>{
+      if(!mounted) return;
+      if(session?.user){
+        setSbUser(session.user);
+        setOnboarded(true);
+      }
+      setAuthLoading(false);
+    });
+    const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{
+      if(!mounted) return;
+      if(session?.user){
+        setSbUser(session.user);
+        setOnboarded(true);
+      } else {
+        setSbUser(null);
+        setOnboarded(false);
+      }
+    });
+    return ()=>{mounted=false;subscription.unsubscribe();};
+  },[]);
+
+  const handleSignOut=useCallback(async()=>{
+    await supabase.auth.signOut();
+    setSbUser(null);setOnboarded(false);
+    try{localStorage.removeItem("bam_auth_token");}catch{}
+    window.location.hash="";
+  },[]);
+
   // Prompt 2: dark mode with localStorage persistence + OS default
   const [dark,setDark]=useState(()=>{
     try{
@@ -5738,7 +5901,7 @@ export default function BAMFull(){
   });
   const [tourActive,setTourActive]=useState(false);
   const [loading,setLoading]=useState(true);
-  useEffect(()=>{ const t=setTimeout(()=>setLoading(false),1800); return ()=>clearTimeout(t); },[]);
+  useEffect(()=>{ if(!authLoading&&onboarded){const t=setTimeout(()=>setLoading(false),1800);return ()=>clearTimeout(t);}setLoading(false); },[authLoading,onboarded]);
   // Analytics: session tracking
   const sessionStartRef=useRef(Date.now());
   useEffect(()=>{
@@ -5782,12 +5945,12 @@ export default function BAMFull(){
     window.addEventListener("offline",goOff);window.addEventListener("online",goOn);
     return ()=>{window.removeEventListener("offline",goOff);window.removeEventListener("online",goOn);};
   },[]);
-  // Prompt 5: multi-tab logout sync
+  // Prompt 5: multi-tab logout sync (Supabase handles cross-tab via onAuthStateChange, keep storage fallback)
   useEffect(()=>{
-    const onStorage=(e)=>{if(e.key==="bam_auth_token"&&!e.newValue){window.location.href="https://byanymeansbball.com/platform";}};
+    const onStorage=(e)=>{if(e.key==="bam_auth_token"&&!e.newValue){handleSignOut();}};
     window.addEventListener("storage",onStorage);
     return ()=>window.removeEventListener("storage",onStorage);
-  },[]);
+  },[handleSignOut]);
   // Prompt 7: API error toast
   const [apiError,setApiError]=useState(null);
   const apiErrorTimer=useRef(null);
@@ -5851,16 +6014,39 @@ export default function BAMFull(){
 
   // Prompt 2: Lifted profile state for app-wide propagation
   const [appProfile, setAppProfile] = useState({
-    name:"Coleman Ayers", handle:"@colemanayers", role:"Head Coach / Trainer",
-    org:"By Any Means Basketball", location:"Miami, FL",
-    bio:"Building players from the inside out — skill, mindset, and culture. Founder of BAM Basketball.",
-    ig:"byanymeans_bball", x:"colemanayers", website:"byanymeans.com",
-    email:"coleman@byanymeans.com", password:"password123",
-    certs:["BAM Certified Coach","Level 3 — Advanced","Max Plan Member"],
+    name:"Coach", handle:"", role:"",
+    org:"", location:"",
+    bio:"",
+    ig:"", x:"", website:"",
+    email:sbUser?.email||"", password:"",
+    certs:["Max Plan Member"],
   });
   const [appPhoto, setAppPhoto] = useState(null);
   const appFirstName = appProfile.name?.split(" ")[0] || "Coach";
-  const appInitials = appProfile.name?.split(" ").map(w=>w[0]||"").join("").toUpperCase()||"CA";
+  const appInitials = appProfile.name?.split(" ").map(w=>w[0]||"").join("").toUpperCase()||"C";
+
+  // Fetch profile from Supabase when user is available
+  useEffect(()=>{
+    if(!sbUser) return;
+    let mounted=true;
+    supabase.from("profiles").select("*").eq("id",sbUser.id).single().then(({data,error})=>{
+      if(!mounted||error||!data) return;
+      const name=[data.first_name,data.last_name].filter(Boolean).join(" ")||"Coach";
+      setAppProfile(prev=>({...prev,
+        name,
+        handle:data.handle||`@${(data.first_name||"").toLowerCase()}${(data.last_name||"").toLowerCase()}`,
+        role:Array.isArray(data.roles)?data.roles.join(" / "):(data.role||prev.role),
+        org:data.org||prev.org,
+        location:[data.city,data.country].filter(Boolean).join(", ")||prev.location,
+        bio:data.bio||prev.bio,
+        ig:data.ig||prev.ig, x:data.x||prev.x, website:data.website||prev.website,
+        email:sbUser.email||prev.email,
+        certs:data.certs||prev.certs,
+      }));
+      if(data.photo_url) setAppPhoto(data.photo_url);
+    });
+    return ()=>{mounted=false;};
+  },[sbUser]);
 
   // Prompt 1: greeting with user name
   const [userName, setUserName] = useState(null);
@@ -5968,17 +6154,80 @@ export default function BAMFull(){
     </div>
   );
 
-  // Prompt 4: unauthenticated access interstitial
-  const [authChecked]=useState(()=>{try{return !!localStorage.getItem("bam_auth_token")||!!localStorage.getItem("onboardingComplete");}catch{return false;}});
-  if(!authChecked&&!onboarded) return (
-    <div style={{fontFamily:"'DM Sans',sans-serif",background:"#111",height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,color:"#ccc"}}>
-      <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:32,color:GOLD,letterSpacing:4}}>BY ANY MEANS</div>
-      <div style={{fontSize:14,color:"#999",maxWidth:320,textAlign:"center",lineHeight:1.6}}>You need to be logged in to access the coaches platform.</div>
-      <a href="https://byanymeansbball.com/platform" style={{marginTop:12,padding:"12px 32px",borderRadius:8,fontSize:14,fontWeight:800,background:GOLD,color:"#111",textDecoration:"none",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1}}>Go to Platform</a>
+  // Auth loading
+  if(authLoading) return (
+    <div style={{fontFamily:"'DM Sans',sans-serif",background:"#111",height:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{width:28,height:28,border:`3px solid ${GOLD}33`,borderTop:`3px solid ${GOLD}`,borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
     </div>
   );
 
-  if(!onboarded&&!tourActive) return <OnboardingFlow onComplete={()=>{setOnboarded(true);try{localStorage.setItem("bam_auth_token","demo");}catch{}}} onTourStart={()=>{setOnboarded(true);setTourActive(true);try{localStorage.setItem("bam_auth_token","demo");}catch{}}}/>;
+  // Not authenticated — show sign-in or onboarding
+  if(!sbUser&&!onboarded){
+    if(showSignIn) return <SignInScreen onBack={()=>setShowSignIn(false)} onSuccess={(user)=>{setSbUser(user);setOnboarded(true);}}/>;
+    if(!tourActive) return <OnboardingFlow
+      onComplete={async(profileData)=>{
+        try{
+          const {data,error}=await supabase.auth.signUp({email:profileData.email,password:profileData.password});
+          if(error) throw error;
+          const user=data.user;
+          if(user){
+            setSbUser(user);
+            await supabase.from("profiles").upsert({
+              id:user.id,
+              first_name:profileData.firstName,
+              last_name:profileData.lastName,
+              country:profileData.country,
+              city:profileData.city,
+              roles:profileData.roles,
+              experience:profileData.experience,
+              age_groups:profileData.ageGroups,
+              separates:profileData.separates,
+              goal_1yr:profileData.goal1yr,
+              goal_10yr:profileData.goal10yr,
+              bio:profileData.bio,
+              photo_url:profileData.profilePhoto||null,
+            });
+            try{localStorage.setItem("onboardingComplete","true");localStorage.setItem("bam_auth_token","sb");}catch{}
+          }
+          setOnboarded(true);
+        }catch(e){
+          console.error("[BAM Signup Error]",e);
+          showApiError?.(e.message||"Sign up failed. Please try again.");
+        }
+      }}
+      onTourStart={async(profileData)=>{
+        try{
+          const {data,error}=await supabase.auth.signUp({email:profileData.email,password:profileData.password});
+          if(error) throw error;
+          const user=data.user;
+          if(user){
+            setSbUser(user);
+            await supabase.from("profiles").upsert({
+              id:user.id,
+              first_name:profileData.firstName,
+              last_name:profileData.lastName,
+              country:profileData.country,
+              city:profileData.city,
+              roles:profileData.roles,
+              experience:profileData.experience,
+              age_groups:profileData.ageGroups,
+              separates:profileData.separates,
+              goal_1yr:profileData.goal1yr,
+              goal_10yr:profileData.goal10yr,
+              bio:profileData.bio,
+              photo_url:profileData.profilePhoto||null,
+            });
+            try{localStorage.setItem("onboardingComplete","true");localStorage.setItem("bam_auth_token","sb");}catch{}
+          }
+          setOnboarded(true);setTourActive(true);
+        }catch(e){
+          console.error("[BAM Signup Error]",e);
+          showApiError?.(e.message||"Sign up failed. Please try again.");
+        }
+      }}
+      onSignIn={()=>setShowSignIn(true)}
+    />;
+  }
 
   return (
     <div style={{fontFamily:"'DM Sans',sans-serif",background:C.bg,height:"var(--app-height,100vh)",display:"flex",color:C.text,transition:"background .3s,color .3s",overflow:"hidden"}}>
@@ -6722,7 +6971,8 @@ export default function BAMFull(){
               notifs={settingsNotifs} updateNotif={updateNotifSetting}
               tz={settingsTz} updateTz={updateTz}
               mapVisible={mapVisible} toggleMapVisible={toggleMapVisible}
-              dismissBanner={dismissBanner} dismissedBanners={dismissedBanners}/>
+              dismissBanner={dismissBanner} dismissedBanners={dismissedBanners}
+              onSignOut={handleSignOut}/>
           )}
 
           {/* 404 fallback for unmatched nav */}
